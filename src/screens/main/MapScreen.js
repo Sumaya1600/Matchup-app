@@ -9,9 +9,9 @@ import * as Location from 'expo-location';
 import { COLORS, GOOGLE_API_KEY } from '../../constants';
 
 const CATEGORIES = [
-  { id: 'courts', label: '🎾 Courts', query: 'tennis court london' },
-  { id: 'clubs', label: '🏛️ Clubs', query: 'tennis club london' },
-  { id: 'coaches', label: '👨‍🏫 Coaches', query: 'tennis coach london' },
+  { id: 'courts', label: 'Courts', query: 'tennis court london' },
+  { id: 'clubs', label: 'Clubs', query: 'tennis club london' },
+  { id: 'coaches', label: 'Coaches', query: 'tennis coach london' },
 ];
 
 const FALLBACK = {
