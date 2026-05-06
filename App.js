@@ -8,10 +8,8 @@ import SplashScreen from './src/screens/SplashScreen';
 import axios from 'axios';
 import { API_URL } from './src/constants';
 
-const LAST_SEEN_KEY = 'matchup_last_accepted_check';
-
 export default function App() {
-  const [user, setUser]       = useState(undefined);
+  const [user, setUser] = useState(undefined);
   const hasChecked = useRef(false);
 
   useEffect(() => {

@@ -1,5 +1,5 @@
-
-========== \src\components\PlayerCard.js ==========
+﻿
+========== C:\Users\sumay\matchup\src\components\PlayerCard.js ==========
 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
@@ -106,7 +106,7 @@ export default function PlayerCard({ player, onMatch }) {
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>{player.name}</Text>
 
-          {/* Age, gender, distance row — no emojis, no dots */}
+          {/* Age, gender, distance row â€” no emojis, no dots */}
           <View style={styles.metaRow}>
             {player.age ? (
               <Text style={styles.metaText}>{player.age} yrs</Text>
@@ -119,7 +119,7 @@ export default function PlayerCard({ player, onMatch }) {
             ) : null}
           </View>
 
-          {/* Skill + sport tags — no emojis */}
+          {/* Skill + sport tags â€” no emojis */}
           <View style={styles.tagRow}>
             <View style={styles.tag}>
               <Text style={styles.tagText}>{player.skill_level}</Text>
@@ -149,7 +149,7 @@ export default function PlayerCard({ player, onMatch }) {
             : (
               <>
                 <Text style={styles.matchBtnText}>{isCoach ? 'Enquire' : 'Match'}</Text>
-                <Text style={styles.matchBtnIcon}>→</Text>
+                <Text style={styles.matchBtnIcon}>â†’</Text>
               </>
             )
           }
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   showMoreText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
 });
 
-========== \src\config\firebase.js ==========
+========== C:\Users\sumay\matchup\src\config\firebase.js ==========
 
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
@@ -254,7 +254,7 @@ export const auth = initializeAuth(app, {
 
 export const db = getFirestore(app);
 
-========== \src\constants\index.js ==========
+========== C:\Users\sumay\matchup\src\constants\index.js ==========
 
 export const SPORTS = ['Tennis'];
 
@@ -299,7 +299,7 @@ export const API_URL = 'https://easter-net-backyard.ngrok-free.dev/api';
 
 export const GOOGLE_API_KEY = 'AIzaSyBDVV9TxnbbKK_Ai1M8MDvJmGgmeip3LAg';
 
-========== \src\navigation\AppNavigator.js ==========
+========== C:\Users\sumay\matchup\src\navigation\AppNavigator.js ==========
 
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -324,7 +324,7 @@ const Stack = createStackNavigator();
 const Tab   = createBottomTabNavigator();
 
 function TabIcon({ name, focused, badgeCount }) {
-  const icons = { Match: '🎾', Courts: '📍', Schedule: '🗓️', Messages: '💬', Profile: '😊' };
+  const icons = { Match: 'ðŸŽ¾', Courts: 'ðŸ“', Schedule: 'ðŸ—“ï¸', Messages: 'ðŸ’¬', Profile: 'ðŸ˜Š' };
   return (
     <View style={[styles.tabItem, focused && styles.tabItemActive]}>
       <Text style={[styles.tabIcon, focused && styles.tabIconActive]}>{icons[name]}</Text>
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   tabBadgeText:  { color: COLORS.white, fontSize: 9, fontWeight: '900' },
 });
 
-========== \src\screens\PendingMatchesScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\PendingMatchesScreen.js ==========
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -533,16 +533,16 @@ export default function PendingMatchesScreen({ navigation }) {
               [myUid]:              match.requester_name, // I see requester's name
               [requesterFirebaseUid]: myName,             // requester sees my name
             },
-            // Keep other_name for backward compat — will be overridden per-user in ChatListScreen
+            // Keep other_name for backward compat â€” will be overridden per-user in ChatListScreen
             other_name:        match.requester_name,
-            last_message:      'Match accepted! 🎾',
+            last_message:      'Match accepted! ðŸŽ¾',
             last_message_time: new Date(),
           });
           sharedChatId = chatRef.id;
         }
 
         Alert.alert(
-          'Match accepted! 🎾',
+          'Match accepted! ðŸŽ¾',
           `You are now matched with ${match.requester_name}. Start chatting!`,
           [
             {
@@ -582,7 +582,7 @@ export default function PendingMatchesScreen({ navigation }) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>←</Text>
+          <Text style={styles.backArrow}>â†</Text>
         </TouchableOpacity>
         <View>
           <Text style={styles.title}>Match Requests</Text>
@@ -611,7 +611,7 @@ export default function PendingMatchesScreen({ navigation }) {
               </View>
               <View style={styles.info}>
                 <Text style={styles.name}>{item.requester_name}</Text>
-                <Text style={styles.meta}>🎾 {item.sport}</Text>
+                <Text style={styles.meta}>ðŸŽ¾ {item.sport}</Text>
                 <Text style={styles.meta}> {item.skill_level}</Text>
               </View>
               <View style={styles.btns}>
@@ -619,13 +619,13 @@ export default function PendingMatchesScreen({ navigation }) {
                   style={styles.acceptBtn}
                   onPress={() => respond(item, 'accepted')}
                 >
-                  <Text style={styles.acceptText}>✓</Text>
+                  <Text style={styles.acceptText}>âœ“</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.declineBtn}
                   onPress={() => respond(item, 'declined')}
                 >
-                  <Text style={styles.declineText}>✕</Text>
+                  <Text style={styles.declineText}>âœ•</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 20 },
 });
 
-========== \src\screens\SplashScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\SplashScreen.js ==========
 
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
@@ -730,11 +730,11 @@ export default function SplashScreen() {
       <Animated.View style={[styles.logoContainer, { transform: [{ scale }], opacity }]}>
         <View style={styles.logoOuter}>
           <View style={styles.logoInner}>
-            <Text style={styles.logoEmoji}>🎾</Text>
+            <Text style={styles.logoEmoji}>ðŸŽ¾</Text>
           </View>
         </View>
         <Text style={styles.title}>Match<Text style={styles.titleAccent}>UP</Text></Text>
-        <Text style={styles.subtitle}>Find · Play · Win</Text>
+        <Text style={styles.subtitle}>Find Â· Play Â· Win</Text>
         <View style={styles.dotsRow}>
           <View style={[styles.dot, styles.dotActive]} />
           <View style={styles.dot} />
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
   dotActive: { backgroundColor: COLORS.primary, width: 24 },
 });
 
-========== \src\screens\auth\LoginScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\auth\LoginScreen.js ==========
 
 import React, { useState } from 'react';
 import {
@@ -820,10 +820,10 @@ export default function LoginScreen({ navigation }) {
       <KeyboardAvoidingView style={styles.container} behavior="padding">
         <View style={styles.topSection}>
           <View style={styles.logoBox}>
-            <Text style={styles.logoEmoji}>🎾</Text>
+            <Text style={styles.logoEmoji}>ðŸŽ¾</Text>
           </View>
           <Text style={styles.brand}>Match<Text style={styles.brandAccent}>UP</Text></Text>
-          <Text style={styles.tagline}>Find · Play · Win</Text>
+          <Text style={styles.tagline}>Find Â· Play Â· Win</Text>
         </View>
 
         <View style={styles.card}>
@@ -858,7 +858,7 @@ export default function LoginScreen({ navigation }) {
           <TouchableOpacity style={styles.button} onPress={login} disabled={loading}>
             {loading
               ? <ActivityIndicator color={COLORS.dark} />
-              : <Text style={styles.buttonText}>Sign in →</Text>}
+              : <Text style={styles.buttonText}>Sign in â†’</Text>}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -921,7 +921,7 @@ const styles = StyleSheet.create({
   registerLink: { color: COLORS.primary, fontWeight: '700' },
 });
 
-========== \src\screens\auth\RegisterScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\auth\RegisterScreen.js ==========
 
 import React, { useState } from 'react';
 import {
@@ -997,7 +997,7 @@ export default function RegisterScreen({ navigation }) {
           lng = loc.coords.longitude;
         }
       } catch {
-        // Location failed — use London fallback
+        // Location failed â€” use London fallback
       }
 
       firebaseCred = await createUserWithEmailAndPassword(
@@ -1053,7 +1053,7 @@ export default function RegisterScreen({ navigation }) {
 
       <View style={styles.headerBar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backArrow}>←</Text>
+          <Text style={styles.backArrow}>â†</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create account</Text>
         <View style={{ width: 40 }} />
@@ -1190,7 +1190,7 @@ export default function RegisterScreen({ navigation }) {
               </>
             )}
 
-            {/* Skill level — no emojis */}
+            {/* Skill level â€” no emojis */}
             <Text style={styles.label}>Skill level</Text>
             <View style={styles.chipRow}>
               {SKILL_LEVELS.map(s => (
@@ -1289,7 +1289,7 @@ const styles = StyleSheet.create({
   signinLink:        { color: COLORS.primary, fontWeight: '700' },
 });
 
-========== \src\screens\main\ChatListScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\main\ChatListScreen.js ==========
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -1330,7 +1330,7 @@ export default function ChatListScreen({ navigation }) {
     return chat.other_name || 'Player';
   };
 
-  // Get unread count — messages from other person not yet read
+  // Get unread count â€” messages from other person not yet read
   const getUnreadCount = (chat) => {
     if (!chat.unread_counts) return 0;
     return chat.unread_counts[uid] || 0;
@@ -1342,7 +1342,7 @@ export default function ChatListScreen({ navigation }) {
     getOtherName(c).toLowerCase().includes(search.toLowerCase())
   );
 
-  // Mark chat as read — clears unread count for current user
+  // Mark chat as read â€” clears unread count for current user
   const markAsRead = async (chatId) => {
     try {
       await updateDoc(doc(db, 'chats', chatId), {
@@ -1396,8 +1396,8 @@ export default function ChatListScreen({ navigation }) {
   };
 
   const getSkillEmoji = (level) => {
-    const map = { Beginner: '🌱', Intermediate: '⚡', Advanced: '🔥', Professional: '🏆' };
-    return map[level] || '🎾';
+    const map = { Beginner: 'ðŸŒ±', Intermediate: 'âš¡', Advanced: 'ðŸ”¥', Professional: 'ðŸ†' };
+    return map[level] || 'ðŸŽ¾';
   };
 
   return (
@@ -1456,7 +1456,7 @@ export default function ChatListScreen({ navigation }) {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Reliability</Text>
                     <Text style={styles.detailValue}>
-                      ⭐ {Number(selectedProfile.reliability_score ?? 5).toFixed(1)} / 5.0
+                      â­ {Number(selectedProfile.reliability_score ?? 5).toFixed(1)} / 5.0
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -1590,7 +1590,7 @@ export default function ChatListScreen({ navigation }) {
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyIconBox}>
-              <Text style={{ fontSize: 44 }}>💬</Text>
+              <Text style={{ fontSize: 44 }}>ðŸ’¬</Text>
             </View>
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptySubtext}>
@@ -1667,7 +1667,7 @@ const styles = StyleSheet.create({
   closeBtnText:    { color: COLORS.dark, fontWeight: '900', fontSize: 15 },
 });
 
-========== \src\screens\main\ChatRoomScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\main\ChatRoomScreen.js ==========
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -1737,7 +1737,7 @@ export default function ChatRoomScreen({ route, navigation }) {
       const participants = chatData.participants || [];
       const otherUid = participants.find(p => p !== uid);
 
-      // Build update — last message + increment other person's unread count
+      // Build update â€” last message + increment other person's unread count
       const updateData = {
         last_message:      msg,
         last_message_time: serverTimestamp(),
@@ -1861,7 +1861,7 @@ export default function ChatRoomScreen({ route, navigation }) {
           ListEmptyComponent={
             <View style={styles.emptyChat}>
               <View style={styles.emptyChatIcon}>
-                <Text style={styles.emptyChatIconText}>💬</Text>
+                <Text style={styles.emptyChatIconText}>ðŸ’¬</Text>
               </View>
               <Text style={styles.emptyChatTitle}>
                 Say hello to {otherName}!
@@ -1888,7 +1888,7 @@ export default function ChatRoomScreen({ route, navigation }) {
             onPress={send}
             disabled={!text.trim()}
           >
-            <Text style={styles.sendIcon}>➤</Text>
+            <Text style={styles.sendIcon}>âž¤</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -1998,7 +1998,7 @@ const styles = StyleSheet.create({
   sendIcon: { color: COLORS.dark, fontSize: 16, fontWeight: '900' },
 });
 
-========== \src\screens\main\MapScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\main\MapScreen.js ==========
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -2132,7 +2132,7 @@ export default function MapScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Find Nearby</Text>
         <Text style={styles.subtitle}>
-          {location ? '📍 Using your location' : '📍 Getting location...'}
+          {location ? 'ðŸ“ Using your location' : 'ðŸ“ Getting location...'}
         </Text>
       </View>
 
@@ -2148,7 +2148,7 @@ export default function MapScreen() {
           autoCapitalize="characters"
         />
         <TouchableOpacity style={styles.searchBtn} onPress={searchByPostcode}>
-          <Text style={styles.searchBtnText}>🔍</Text>
+          <Text style={styles.searchBtnText}>ðŸ”</Text>
         </TouchableOpacity>
       </View>
 
@@ -2173,18 +2173,18 @@ export default function MapScreen() {
               <View key={place.place_id || index} style={styles.card}>
                 <Text style={styles.placeName}>{place.name}</Text>
                 <Text style={styles.placeAddress}>
-                  📍 {place.vicinity || place.formatted_address || 'London'}
+                  ðŸ“ {place.vicinity || place.formatted_address || 'London'}
                 </Text>
                 <View style={styles.metaRow}>
                   {place.rating && (
-                    <Text style={styles.rating}>⭐ {place.rating}</Text>
+                    <Text style={styles.rating}>â­ {place.rating}</Text>
                   )}
                   {(place.open !== undefined || place.opening_hours) && (
                     <Text style={[styles.openStatus, {
                       color: (place.open || place.opening_hours?.open_now)
                         ? COLORS.primary : COLORS.danger
                     }]}>
-                      {(place.open || place.opening_hours?.open_now) ? '● Open' : '● Closed'}
+                      {(place.open || place.opening_hours?.open_now) ? 'â— Open' : 'â— Closed'}
                     </Text>
                   )}
                 </View>
@@ -2192,12 +2192,12 @@ export default function MapScreen() {
                   <TouchableOpacity
                     style={styles.dirBtn}
                     onPress={() => openDirections(place)}>
-                    <Text style={styles.dirBtnText}>🗺️ Directions</Text>
+                    <Text style={styles.dirBtnText}>ðŸ—ºï¸ Directions</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.bookBtn}
                     onPress={() => openBooking(place)}>
-                    <Text style={styles.bookBtnText}>📅 Book</Text>
+                    <Text style={styles.bookBtnText}>ðŸ“… Book</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2272,7 +2272,7 @@ const styles = StyleSheet.create({
   bookBtnText: { color: COLORS.dark, fontWeight: '800', fontSize: 13 },
 });
 
-========== \src\screens\main\MatchScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\main\MatchScreen.js ==========
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -2359,14 +2359,14 @@ export default function MatchScreen({ navigation }) {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.greeting}>Ready to play? 🎾</Text>
+            <Text style={styles.greeting}>Ready to play? ðŸŽ¾</Text>
             <Text style={styles.title}>Find a partner</Text>
           </View>
           <TouchableOpacity
             style={styles.notifBtn}
             onPress={() => navigation.navigate('Pending Matches')}
           >
-            <Text style={styles.notifIcon}>🔔</Text>
+            <Text style={styles.notifIcon}>ðŸ””</Text>
             {pendingCount > 0 && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{pendingCount}</Text>
@@ -2434,7 +2434,7 @@ export default function MatchScreen({ navigation }) {
           !error && (
             <View style={styles.empty}>
               <View style={styles.emptyBall}>
-                <Text style={styles.emptyIcon}>🎾</Text>
+                <Text style={styles.emptyIcon}>ðŸŽ¾</Text>
               </View>
               <Text style={styles.emptyTitle}>
                 {allPlayers.length === 0
@@ -2611,7 +2611,7 @@ const styles = StyleSheet.create({
   },
 });
 
-========== \src\screens\main\ProfileScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\main\ProfileScreen.js ==========
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -2750,7 +2750,7 @@ export default function ProfileScreen() {
           <View style={styles.scoreCard}>
             <View style={styles.scoreLeft}>
               <View style={styles.scoreIconBox}>
-                <Text style={styles.scoreStar}>★</Text>
+                <Text style={styles.scoreStar}>â˜…</Text>
               </View>
               <View>
                 <Text style={styles.scoreLabel}>Reliability score</Text>
@@ -2812,7 +2812,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Skill level — no emojis */}
+        {/* Skill level/}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Skill level</Text>
           <View style={styles.chipRow}>
@@ -2946,7 +2946,7 @@ const styles = StyleSheet.create({
   logoutText:     { color: COLORS.danger, fontSize: 16, fontWeight: '700' },
 });
 
-========== \src\screens\main\ScheduleScreen.js ==========
+========== C:\Users\sumay\matchup\src\screens\main\ScheduleScreen.js ==========
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -3080,7 +3080,7 @@ export default function ScheduleScreen() {
       );
       setRatingMatch(null);
       setSelectedRating(0);
-      // Remove from list — match is now completed
+      // Remove from list â€” match is now completed
       setMatches(prev => prev.filter(m => m.id !== ratingMatch.id));
     } catch (e) {
       Alert.alert('Error', 'Could not submit rating. Try again.');
@@ -3224,18 +3224,18 @@ export default function ScheduleScreen() {
               {[1, 2, 3, 4, 5].map(star => (
                 <TouchableOpacity key={star} onPress={() => setSelectedRating(star)}>
                   <Text style={[styles.star, selectedRating >= star && styles.starActive]}>
-                    ★
+                    â˜…
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
             <Text style={styles.ratingLabel}>
               {selectedRating === 0 && 'Tap a star to rate'}
-              {selectedRating === 1 && '1 — Poor'}
-              {selectedRating === 2 && '2 — Below average'}
-              {selectedRating === 3 && '3 — Average'}
-              {selectedRating === 4 && '4 — Good'}
-              {selectedRating === 5 && '5 — Excellent'}
+              {selectedRating === 1 && '1 â€” Poor'}
+              {selectedRating === 2 && '2 â€” Below average'}
+              {selectedRating === 3 && '3 â€” Average'}
+              {selectedRating === 4 && '4 â€” Good'}
+              {selectedRating === 5 && '5 â€” Excellent'}
             </Text>
             <View style={styles.modalBtns}>
               <TouchableOpacity
@@ -3279,7 +3279,7 @@ export default function ScheduleScreen() {
               <View style={styles.info}>
                 <Text style={styles.name}>{item.other_name}</Text>
                 <Text style={styles.meta}>
-                  Tennis  •  {item.skill_level}
+                  Tennis  â€¢  {item.skill_level}
                 </Text>
                 {item.scheduled_time ? (
                   <Text style={styles.scheduled}>Scheduled: {item.scheduled_time}</Text>
@@ -3312,7 +3312,7 @@ export default function ScheduleScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🎾</Text>
+            <Text style={styles.emptyIcon}>ðŸŽ¾</Text>
             <Text style={styles.emptyText}>No accepted matches yet</Text>
             <Text style={styles.emptySubtext}>
               Accept a match request to schedule a game
@@ -3374,7 +3374,7 @@ const styles = StyleSheet.create({
   modalSubmitText:   { color: COLORS.dark, fontWeight: '900' },
 });
 
-========== \src\services\api.js ==========
+========== C:\Users\sumay\matchup\src\services\api.js ==========
 
 import axios from 'axios';
 import { API_URL } from '../constants';
@@ -3424,13 +3424,13 @@ export const respondToMatch    = (matchId, response)            => api.put(`/mat
 export const scheduleMatch     = (matchId, data)                => api.put(`/matches/${matchId}/schedule`, data);
 export const rateMatch         = (matchId, ratedUserId, rating) => api.post(`/matches/${matchId}/rate`, { rated_user_id: ratedUserId, rating });
 
-========== \matchup-backend\.env ==========
+========== C:\Users\sumay\matchup\matchup-backend\.env ==========
 
 PORT=3000
 DATABASE_URL=postgresql://postgres:dbpassword@localhost:5432/matchup
 FIREBASE_PROJECT_ID=matchup-app-204ff
 
-========== \matchup-backend\package-lock.json ==========
+========== C:\Users\sumay\matchup\matchup-backend\package-lock.json ==========
 
 {
   "name": "matchup-backend",
@@ -6703,7 +6703,7 @@ FIREBASE_PROJECT_ID=matchup-app-204ff
   }
 }
 
-========== \matchup-backend\package.json ==========
+========== C:\Users\sumay\matchup\matchup-backend\package.json ==========
 
 {
   "name": "matchup-backend",
@@ -6726,7 +6726,7 @@ FIREBASE_PROJECT_ID=matchup-app-204ff
   }
 }
 
-========== \matchup-backend\src\index.js ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\index.js ==========
 
 const express = require('express');
 const cors = require('cors');
@@ -6753,8 +6753,11 @@ app.use('/api/users',   require('./routes/users'));
 app.use('/api/matches', require('./routes/matches'));
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MatchUP backend running 🎾' });
+  res.json({ status: 'ok', message: 'MatchUP backend running ðŸŽ¾' });
 });
+
+// Health check for the offline banner
+app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: Date.now() }));
 
 app.use((req, res) => {
   res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
@@ -6770,14 +6773,14 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`MatchUP backend running on port ${PORT}`);
 });
 
-========== \matchup-backend\src\db\pool.js ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\db\pool.js ==========
 
 const { Pool } = require('pg');
 require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  // Optional: increase if you see "too many clients" errors
+  // increase if you see "too many clients" errors
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -6789,7 +6792,7 @@ pool.on('error', (err) => {
 
 module.exports = pool;
 
-========== \matchup-backend\src\db\schema.sql ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\db\schema.sql ==========
 
 -- MatchUP PostgreSQL Schema
 -- Run this once to create your database tables
@@ -6831,20 +6834,20 @@ CREATE INDEX IF NOT EXISTS idx_matches_requester  ON matches(requester_id);
 CREATE INDEX IF NOT EXISTS idx_matches_receiver   ON matches(receiver_id);
 CREATE INDEX IF NOT EXISTS idx_matches_status     ON matches(status);
 
-========== \matchup-backend\src\middleware\auth.js ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\middleware\auth.js ==========
 
 const admin = require('firebase-admin');
 require('dotenv').config();
 
 if (!admin.apps.length) {
   try {
-    // OPTION A (simple — for development, no service account file needed):
+    // OPTION A (simple â€” for development, no service account file needed):
     admin.initializeApp({
       projectId: process.env.FIREBASE_PROJECT_ID,
     });
 
-    // OPTION B (recommended for production — download serviceAccountKey.json from
-    // Firebase Console → Project Settings → Service Accounts → Generate new private key
+    // OPTION B (recommended for production â€” download serviceAccountKey.json from
+    // Firebase Console â†’ Project Settings â†’ Service Accounts â†’ Generate new private key
     // then uncomment the 3 lines below and comment out the initializeApp above):
     //
     // const serviceAccount = require('../../serviceAccountKey.json');
@@ -6875,7 +6878,7 @@ module.exports = async (req, res, next) => {
   }
 };
 
-========== \matchup-backend\src\routes\auth.js ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\routes\auth.js ==========
 
 const router = require('express').Router();
 const pool   = require('../db/pool');
@@ -6941,7 +6944,7 @@ router.post('/register', async (req, res) => {
 
 module.exports = router;
 
-========== \matchup-backend\src\routes\matches.js ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\routes\matches.js ==========
 
 const router = require('express').Router();
 const pool   = require('../db/pool');
@@ -7189,7 +7192,7 @@ router.get('/accepted/:uid', auth, async (req, res) => {
 
 module.exports = router;
 
-========== \matchup-backend\src\routes\users.js ==========
+========== C:\Users\sumay\matchup\matchup-backend\src\routes\users.js ==========
 
 const router = require('express').Router();
 const pool   = require('../db/pool');

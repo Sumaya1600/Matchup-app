@@ -20,17 +20,24 @@ export default function ChatListScreen({ navigation }) {
   const [profileLoading, setProfileLoading]   = useState(false);
   const uid = auth.currentUser?.uid;
 
-  useEffect(() => {
-    if (!uid) return;
-    const q = query(
-      collection(db, 'chats'),
-      where('participants', 'array-contains', uid),
-      orderBy('last_message_time', 'desc')
-    );
-    return onSnapshot(q, snap => {
-      setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-  }, []);
+useEffect(() => {
+  if (!uid || !auth.currentUser) {
+    setChats([]);
+    return;
+  }
+  
+  const q = query(
+    collection(db, 'chats'),
+    where('participants', 'array-contains', uid),
+    orderBy('last_message_time', 'desc')
+  );
+  
+  const unsubscribe = onSnapshot(q, snap => {
+    setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+  
+  return () => unsubscribe();
+}, [uid]);
 
   const getOtherName = (chat) => {
     if (chat.names && uid && chat.names[uid]) return chat.names[uid];
@@ -102,11 +109,6 @@ export default function ChatListScreen({ navigation }) {
     return parts.length > 1 ? parts[0][0] + parts[1][0] : name[0];
   };
 
-  const getSkillEmoji = (level) => {
-    const map = { Beginner: '🌱', Intermediate: '⚡', Advanced: '🔥', Professional: '🏆' };
-    return map[level] || '🎾';
-  };
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
 
@@ -145,7 +147,7 @@ export default function ChatListScreen({ navigation }) {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Skill level</Text>
                     <Text style={styles.detailValue}>
-                      {getSkillEmoji(selectedProfile.skill_level)} {selectedProfile.skill_level}
+                      {selectedProfile.skill_level}
                     </Text>
                   </View>
                   {selectedProfile.age && (
@@ -163,7 +165,7 @@ export default function ChatListScreen({ navigation }) {
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Reliability</Text>
                     <Text style={styles.detailValue}>
-                      ⭐ {Number(selectedProfile.reliability_score ?? 5).toFixed(1)} / 5.0
+                      {Number(selectedProfile.reliability_score ?? 5).toFixed(1)} / 5.0
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
@@ -296,9 +298,6 @@ export default function ChatListScreen({ navigation }) {
         }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <View style={styles.emptyIconBox}>
-              <Text style={{ fontSize: 44 }}>💬</Text>
-            </View>
             <Text style={styles.emptyTitle}>No messages yet</Text>
             <Text style={styles.emptySubtext}>
               Match with a player on the Match tab and start coordinating your game
@@ -342,7 +341,6 @@ const styles = StyleSheet.create({
   unreadBadgeText: { color: COLORS.dark, fontSize: 11, fontWeight: '900' },
   emptyContainer:  { flex: 1 },
   empty:           { alignItems: 'center', marginTop: 80, paddingHorizontal: 32 },
-  emptyIconBox:    { width: 90, height: 90, borderRadius: 45, backgroundColor: COLORS.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: COLORS.primary + '40' },
   emptyTitle:      { fontSize: 22, fontWeight: '900', color: COLORS.textLight, marginBottom: 8 },
   emptySubtext:    { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
   emptyBtn:        { backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },

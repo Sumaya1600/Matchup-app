@@ -1,0 +1,4171 @@
+MATCHUP CODE BUNDLE
+Generated: 05/03/2026 18:35:27
+Project root: C:\Users\sumay\matchup
+======================================================================
+
+
+########## FRONTEND (React Native / Expo) ##########
+
+
+===== FILE: src\components\PlayerCard.js =====
+
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { auth } from '../config/firebase';
+import { sendMatchRequest } from '../services/api';
+import { COLORS } from '../constants';
+
+export default function PlayerCard({ player, onMatch }) {
+  const [loading, setLoading]   = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    return (parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0][0]).toUpperCase();
+  };
+
+  const getScoreColor = (score) => {
+    if (score >= 80) return COLORS.primary;
+    if (score >= 55) return COLORS.warning;
+    return COLORS.danger;
+  };
+
+  const groupAvailability = (slots) => {
+    if (!Array.isArray(slots) || slots.length === 0) return [];
+    const days = {};
+    slots.forEach(slot => {
+      const parts = slot.split(' ');
+      const day   = parts.slice(0, -1).join(' ');
+      const time  = parts[parts.length - 1];
+      if (!days[day]) days[day] = [];
+      days[day].push(time);
+    });
+    return Object.entries(days).map(([day, times]) => ({
+      day,
+      times: times.join(' & '),
+    }));
+  };
+
+  const handleMatch = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) { Alert.alert('Not logged in'); return; }
+    setLoading(true);
+    try {
+      await sendMatchRequest({
+        requester_id: uid,
+        receiver_id:  player.id,
+        sport:        player.sport || 'Tennis',
+      });
+      Alert.alert('Request sent!', `Match request sent to ${player.name}.`, [{ text: 'Great!' }]);
+      onMatch?.();
+    } catch (e) {
+      if (e.response?.status === 409) {
+        Alert.alert('Already sent', 'You already sent a request to this player.');
+        onMatch?.();
+      } else if (e.response?.status === 404) {
+        Alert.alert('Player not found');
+        onMatch?.();
+      } else {
+        Alert.alert('Could not send request', e.response?.data?.error || e.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const score      = player.compatibility_score ?? 0;
+  const scoreColor = getScoreColor(score);
+  const grouped    = groupAvailability(player.availability);
+  const visible    = expanded || grouped.length <= 3 ? grouped : grouped.slice(0, 3);
+
+  const distanceMiles  = player.distance_miles;
+  const distanceLabel  = distanceMiles !== undefined
+    ? distanceMiles < 0.1 ? 'Nearby' : `${distanceMiles} mi`
+    : null;
+
+  const isCoach = player.user_type === 'coach';
+
+  return (
+    <View style={[styles.card, isCoach && styles.coachCard]}>
+
+      {/* Coach badge */}
+      {isCoach && (
+        <View style={styles.coachBadge}>
+          <Text style={styles.coachBadgeText}>Coach</Text>
+        </View>
+      )}
+
+      {/* Top row */}
+      <View style={styles.topRow}>
+
+        {/* Score badge */}
+        <View style={[styles.scoreBadge, { borderColor: scoreColor }]}>
+          <Text style={[styles.scoreNum, { color: scoreColor }]}>{score}</Text>
+          <Text style={[styles.scorePct, { color: scoreColor }]}>%</Text>
+        </View>
+
+        {/* Avatar */}
+        <View style={[styles.avatar, { borderColor: scoreColor + '50' }]}>
+          <Text style={styles.avatarText}>{getInitials(player.name)}</Text>
+        </View>
+
+        {/* Info */}
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>{player.name}</Text>
+
+          {/* Age, gender, distance row — no emojis, no dots */}
+          <View style={styles.metaRow}>
+            {player.age ? (
+              <Text style={styles.metaText}>{player.age} yrs</Text>
+            ) : null}
+            {player.gender ? (
+              <Text style={styles.metaText}>{player.gender}</Text>
+            ) : null}
+            {distanceLabel ? (
+              <Text style={styles.metaText}>{distanceLabel}</Text>
+            ) : null}
+          </View>
+
+          {/* Skill + sport tags — no emojis */}
+          <View style={styles.tagRow}>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>{player.skill_level}</Text>
+            </View>
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>Tennis</Text>
+            </View>
+          </View>
+
+          <Text style={styles.reliability}>
+            {Number(player.reliability_score ?? 5).toFixed(1)} reliability
+          </Text>
+        </View>
+
+        {/* Match / Enquire button */}
+        <TouchableOpacity
+          style={[
+            styles.matchBtn,
+            isCoach && styles.coachBtn,
+            loading && styles.matchBtnDisabled,
+          ]}
+          onPress={handleMatch}
+          disabled={loading}
+        >
+          {loading
+            ? <ActivityIndicator size="small" color={COLORS.dark} />
+            : (
+              <>
+                <Text style={styles.matchBtnText}>{isCoach ? 'Enquire' : 'Match'}</Text>
+                <Text style={styles.matchBtnIcon}>→</Text>
+              </>
+            )
+          }
+        </TouchableOpacity>
+      </View>
+
+      {/* Coach bio */}
+      {isCoach && player.coach_info ? (
+        <View style={styles.coachInfoBox}>
+          <Text style={styles.coachInfoLabel}>About</Text>
+          <Text style={styles.coachInfoText}>{player.coach_info}</Text>
+        </View>
+      ) : null}
+
+      {/* Availability */}
+      {grouped.length > 0 && (
+        <View style={styles.availSection}>
+          <Text style={styles.availTitle}>Available</Text>
+          <View style={styles.availGrid}>
+            {visible.map(({ day, times }) => (
+              <View key={day} style={styles.availChip}>
+                <Text style={styles.availDay}>{day}</Text>
+                <Text style={styles.availTime}>{times}</Text>
+              </View>
+            ))}
+          </View>
+          {grouped.length > 3 && (
+            <TouchableOpacity
+              style={styles.showMoreBtn}
+              onPress={() => setExpanded(v => !v)}
+            >
+              <Text style={styles.showMoreText}>
+                {expanded ? 'Show less' : `Show all ${grouped.length} days`}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  card:         { backgroundColor: COLORS.darkCard, borderRadius: 16, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.primary + '20', elevation: 3 },
+  coachCard:    { borderColor: '#7C3AED' + '40' },
+  coachBadge:   { alignSelf: 'flex-start', backgroundColor: '#7C3AED' + '25', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 8, borderWidth: 1, borderColor: '#7C3AED' + '50' },
+  coachBadgeText: { color: '#A78BFA', fontSize: 11, fontWeight: '700' },
+  topRow:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  scoreBadge:   { width: 46, height: 46, borderRadius: 23, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  scoreNum:     { fontSize: 14, fontWeight: '900', lineHeight: 16 },
+  scorePct:     { fontSize: 9, fontWeight: '700' },
+  avatar:       { width: 46, height: 46, borderRadius: 23, backgroundColor: COLORS.primary + '15', alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  avatarText:   { fontSize: 16, fontWeight: '900', color: COLORS.primary },
+  info:         { flex: 1, gap: 2 },
+  name:         { fontSize: 14, fontWeight: '800', color: COLORS.textLight },
+  metaRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  metaText:     { fontSize: 11, color: COLORS.muted, fontWeight: '600' },
+  tagRow:       { flexDirection: 'row', gap: 4, flexWrap: 'wrap' },
+  tag:          { backgroundColor: COLORS.secondary, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: COLORS.primary + '25' },
+  tagText:      { fontSize: 10, color: COLORS.muted, fontWeight: '600' },
+  reliability:  { fontSize: 11, color: COLORS.primary, fontWeight: '700' },
+  matchBtn:     { backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', flexDirection: 'row', gap: 3, minWidth: 70, justifyContent: 'center' },
+  coachBtn:     { backgroundColor: '#7C3AED' },
+  matchBtnDisabled: { opacity: 0.6 },
+  matchBtnText: { color: COLORS.dark, fontWeight: '800', fontSize: 12 },
+  matchBtnIcon: { color: COLORS.dark, fontWeight: '900', fontSize: 12 },
+  coachInfoBox: { marginTop: 10, padding: 10, backgroundColor: '#7C3AED' + '15', borderRadius: 10, borderWidth: 1, borderColor: '#7C3AED' + '30' },
+  coachInfoLabel: { fontSize: 10, color: '#A78BFA', fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
+  coachInfoText:  { fontSize: 12, color: COLORS.muted, lineHeight: 18 },
+  availSection: { marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.primary + '15' },
+  availTitle:   { fontSize: 11, color: COLORS.muted, fontWeight: '700', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' },
+  availGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  availChip:    { backgroundColor: COLORS.secondary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: COLORS.primary + '30', alignItems: 'center' },
+  availDay:     { fontSize: 11, color: COLORS.textLight, fontWeight: '700' },
+  availTime:    { fontSize: 10, color: COLORS.primary, fontWeight: '600', marginTop: 1 },
+  showMoreBtn:  { marginTop: 8, alignSelf: 'flex-start', paddingVertical: 4 },
+  showMoreText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
+});
+
+
+===== FILE: src\config\firebase.js =====
+
+import { initializeApp } from 'firebase/app';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBkgfXX-zDF_zGnKga0sfb-jsojYAdhgCg",
+  authDomain: "matchup-app-204ff.firebaseapp.com",
+  projectId: "matchup-app-204ff",
+  storageBucket: "matchup-app-204ff.firebasestorage.app",
+  messagingSenderId: "409182189852",
+  appId: "1:409182189852:web:d59c95cf5a790a0fc022d9"
+};
+
+const app = initializeApp(firebaseConfig);
+
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});
+
+export const db = getFirestore(app);
+
+
+===== FILE: src\constants\index.js =====
+
+export const SPORTS = ['Tennis'];
+
+export const SKILL_LEVELS = [
+  'Beginner',
+  'Intermediate',
+  'Advanced',
+  'Professional',
+];
+
+export const AVAILABILITY_SLOTS = [
+  'Monday AM', 'Monday PM',
+  'Tuesday AM', 'Tuesday PM',
+  'Wednesday AM', 'Wednesday PM',
+  'Thursday AM', 'Thursday PM',
+  'Friday AM', 'Friday PM',
+  'Saturday AM', 'Saturday PM',
+  'Sunday AM', 'Sunday PM',
+];
+
+export const COLORS = {
+  primary: '#C8F000',
+  primaryDark: '#9DB800',
+  secondary: '#1A1A2E',
+  accent: '#7C3AED',
+  accentLight: '#EDE9FE',
+  text: '#1A1A2E',
+  textLight: '#F8FAFC',
+  muted: '#6B7280',
+  success: '#C8F000',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+  white: '#FFFFFF',
+  black: '#000000',
+  border: '#E5E7EB',
+  card: '#FFFFFF',
+  dark: '#1A1A2E',
+  darkCard: '#242444',
+};
+
+export const API_URL = 'https://easter-net-backyard.ngrok-free.dev/api';
+
+export const GOOGLE_API_KEY = 'AIzaSyBDVV9TxnbbKK_Ai1M8MDvJmGgmeip3LAg';
+
+
+===== FILE: src\navigation\AppNavigator.js =====
+
+import React, { useState, useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { View, Text, StyleSheet } from 'react-native';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+
+import LoginScreen          from '../screens/auth/LoginScreen';
+import RegisterScreen       from '../screens/auth/RegisterScreen';
+import MatchScreen          from '../screens/main/MatchScreen';
+import MapScreen            from '../screens/main/MapScreen';
+import ChatListScreen       from '../screens/main/ChatListScreen';
+import ChatRoomScreen       from '../screens/main/ChatRoomScreen';
+import ProfileScreen        from '../screens/main/ProfileScreen';
+import PendingMatchesScreen from '../screens/PendingMatchesScreen';
+import ScheduleScreen       from '../screens/main/ScheduleScreen';
+import { COLORS }           from '../constants';
+import { auth, db }         from '../config/firebase';
+
+const Stack = createStackNavigator();
+const Tab   = createBottomTabNavigator();
+
+function TabIcon({ name, focused, badgeCount }) {
+  const icons = { Match: '🎾', Courts: '📍', Schedule: '🗓️', Messages: '💬', Profile: '😊' };
+  return (
+    <View style={[styles.tabItem, focused && styles.tabItemActive]}>
+      <Text style={[styles.tabIcon, focused && styles.tabIconActive]}>{icons[name]}</Text>
+      {badgeCount > 0 && (
+        <View style={styles.tabBadge}>
+          <Text style={styles.tabBadgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function MainTabs() {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const uid = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (!uid) return;
+
+    // Listen to all chats. Sum unread_counts[uid] across every chat.
+    // This mirrors the unread_counts map written by ChatRoomScreen on send
+    // and reset to 0 when the chat is opened.
+    const chatQ = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', uid)
+    );
+
+    return onSnapshot(chatQ, (snap) => {
+      let total = 0;
+      snap.docs.forEach(chatDoc => {
+        const data = chatDoc.data();
+        const unread = data.unread_counts?.[uid] ?? 0;
+        total += Number(unread) || 0;
+      });
+      setUnreadCount(total);
+    });
+  }, [uid]);
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused }) => (
+          <TabIcon
+            name={route.name}
+            focused={focused}
+            badgeCount={route.name === 'Messages' ? unreadCount : 0}
+          />
+        ),
+        tabBarLabel: ({ focused }) => (
+          <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{route.name}</Text>
+        ),
+        tabBarActiveTintColor:   COLORS.primary,
+        tabBarInactiveTintColor: COLORS.muted,
+        tabBarStyle: {
+          backgroundColor: COLORS.darkCard,
+          borderTopColor:  COLORS.primary + '20',
+          borderTopWidth:  1,
+          height:          85,
+          paddingBottom:   20,
+          paddingTop:      10,
+        },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Match"    component={MatchScreen} />
+      <Tab.Screen name="Courts"   component={MapScreen} />
+      <Tab.Screen name="Schedule" component={ScheduleScreen} />
+      <Tab.Screen name="Messages" component={ChatListScreen} />
+      <Tab.Screen name="Profile"  component={ProfileScreen} />
+    </Tab.Navigator>
+  );
+}
+
+export default function AppNavigator({ user }) {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {!user ? (
+          <>
+            <Stack.Screen name="Login"    component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen
+              name="ChatRoom"
+              component={ChatRoomScreen}
+              options={{
+                headerShown: true,
+                headerStyle:      { backgroundColor: COLORS.darkCard },
+                headerTintColor:  COLORS.textLight,
+                headerTitleStyle: { fontWeight: '800', color: COLORS.textLight },
+                headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="Pending Matches"
+              component={PendingMatchesScreen}
+              options={{ headerShown: false }}
+            />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabItem:       { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  tabItemActive: { backgroundColor: COLORS.primary + '25', borderWidth: 1.5, borderColor: COLORS.primary + '60' },
+  tabIcon:       { fontSize: 24, opacity: 0.5 },
+  tabIconActive: { opacity: 1, fontSize: 26 },
+  tabLabel:      { fontSize: 11, color: COLORS.muted, fontWeight: '600', marginTop: 2 },
+  tabLabelActive:{ color: COLORS.primary, fontWeight: '700' },
+  tabBadge:      { position: 'absolute', top: 2, right: 2, backgroundColor: COLORS.danger, borderRadius: 8, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: COLORS.darkCard },
+  tabBadgeText:  { color: COLORS.white, fontSize: 9, fontWeight: '900' },
+});
+
+
+===== FILE: src\screens\auth\LoginScreen.js =====
+
+import React, { useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, Alert, ActivityIndicator,
+  KeyboardAvoidingView, SafeAreaView
+} from 'react-native';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../config/firebase';
+import { COLORS } from '../../constants';
+
+export default function LoginScreen({ navigation }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const login = async () => {
+    if (!email || !password) return Alert.alert('Please fill in all fields');
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+    } catch (e) {
+      Alert.alert('Login failed', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <View style={styles.topSection}>
+          <View style={styles.logoBox}>
+            <Text style={styles.logoEmoji}>🎾</Text>
+          </View>
+          <Text style={styles.brand}>Match<Text style={styles.brandAccent}>UP</Text></Text>
+          <Text style={styles.tagline}>Find · Play · Win</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.title}>Welcome</Text>
+          <Text style={styles.subtitle}>Your tennis partner is waiting</Text>
+
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={styles.input}
+              placeholder=""
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholderTextColor={COLORS.muted}
+            />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder=''
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholderTextColor={COLORS.muted}
+            />
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={login} disabled={loading}>
+            {loading
+              ? <ActivityIndicator color={COLORS.dark} />
+              : <Text style={styles.buttonText}>Sign in →</Text>}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.registerBtn}
+            onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.registerText}>
+              New here? <Text style={styles.registerLink}>Create account</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.secondary },
+  container: { flex: 1, justifyContent: 'center', padding: 24 },
+  topSection: { alignItems: 'center', marginBottom: 32 },
+  logoBox: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6, shadowRadius: 16, elevation: 8,
+  },
+  logoEmoji: { fontSize: 36 },
+  brand: {
+    fontSize: 36, fontWeight: '900',
+    color: COLORS.textLight, letterSpacing: 2,
+  },
+  brandAccent: { color: COLORS.primary },
+  tagline: { fontSize: 13, color: COLORS.primary, letterSpacing: 5, marginTop: 4 },
+  card: {
+    backgroundColor: COLORS.darkCard,
+    borderRadius: 24, padding: 28,
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+  },
+  title: { fontSize: 24, fontWeight: '800', color: COLORS.textLight, marginBottom: 4 },
+  subtitle: { fontSize: 14, color: COLORS.muted, marginBottom: 24 },
+  inputWrapper: { marginBottom: 16 },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: COLORS.primary, marginBottom: 6 },
+  input: {
+    backgroundColor: COLORS.secondary, borderWidth: 1,
+    borderColor: COLORS.primary + '40', borderRadius: 12,
+    padding: 14, fontSize: 16, color: COLORS.textLight,
+  },
+  button: {
+    backgroundColor: COLORS.primary, borderRadius: 12,
+    padding: 16, alignItems: 'center', marginTop: 8,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 12, elevation: 6,
+  },
+  buttonText: { color: COLORS.dark, fontSize: 16, fontWeight: '800' },
+  registerBtn: { marginTop: 20, alignItems: 'center' },
+  registerText: { fontSize: 14, color: COLORS.muted },
+  registerLink: { color: COLORS.primary, fontWeight: '700' },
+});
+
+
+===== FILE: src\screens\auth\RegisterScreen.js =====
+
+import React, { useState } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  Alert, ActivityIndicator, ScrollView, KeyboardAvoidingView, Platform,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import * as Location from 'expo-location';
+import { auth } from '../../config/firebase';
+import { registerUser } from '../../services/api';
+import { COLORS, SKILL_LEVELS, AVAILABILITY_SLOTS } from '../../constants';
+
+const GENDERS    = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+const USER_TYPES = ['player', 'coach'];
+
+export default function RegisterScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const [name, setName]                 = useState('');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
+  const [age, setAge]                   = useState('');
+  const [gender, setGender]             = useState('');
+  const [userType, setUserType]         = useState('player');
+  const [coachInfo, setCoachInfo]       = useState('');
+  const [skill, setSkill]               = useState(SKILL_LEVELS[0]);
+  const [availability, setAvailability] = useState([]);
+  const [loading, setLoading]           = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const toggleSlot = (slot) =>
+    setAvailability(prev =>
+      prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot]
+    );
+
+  const validate = () => {
+    if (!name.trim()) {
+      Alert.alert('Missing name', 'Please enter your full name.'); return false;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      Alert.alert('Invalid email', 'Please enter a valid email.'); return false;
+    }
+    if (password.length < 6) {
+      Alert.alert('Weak password', 'Password must be at least 6 characters.'); return false;
+    }
+    if (!age || isNaN(Number(age)) || Number(age) < 13 || Number(age) > 100) {
+      Alert.alert('Invalid age', 'Please enter a valid age between 13 and 100.'); return false;
+    }
+    if (!gender) {
+      Alert.alert('Select gender', 'Please select your gender.'); return false;
+    }
+    if (availability.length === 0) {
+      Alert.alert('No availability', 'Please select at least one time slot.'); return false;
+    }
+    return true;
+  };
+
+  const register = async () => {
+    if (!validate()) return;
+    setLoading(true);
+
+    let firebaseCred = null;
+
+    try {
+      let lat = 51.5074, lng = -0.1278;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          lat = loc.coords.latitude;
+          lng = loc.coords.longitude;
+        }
+      } catch {
+        // Location failed — use London fallback
+      }
+
+      firebaseCred = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
+
+      await registerUser({
+        firebase_uid: firebaseCred.user.uid,
+        name:         name.trim(),
+        email:        email.trim().toLowerCase(),
+        sport:        'Tennis',
+        skill_level:  skill,
+        latitude:     lat,
+        longitude:    lng,
+        radius_km:    10,
+        availability,
+        age:          parseInt(age),
+        gender,
+        user_type:    userType,
+        coach_info:   userType === 'coach' ? coachInfo.trim() || null : null,
+      });
+
+      console.log(`Registration complete: ${name.trim()} (${email.trim()})`);
+
+    } catch (e) {
+      if (firebaseCred?.user) {
+        try {
+          await deleteUser(firebaseCred.user);
+          console.log('Rolled back Firebase account');
+        } catch (rollbackError) {
+          console.warn('Could not rollback Firebase account:', rollbackError.message);
+        }
+      }
+
+      let msg = 'Something went wrong. Please try again.';
+      if (e.code === 'auth/email-already-in-use') msg = 'This email is already registered. Try signing in instead.';
+      else if (e.code === 'auth/invalid-email')   msg = 'Please enter a valid email address.';
+      else if (e.code === 'auth/weak-password')   msg = 'Please choose a stronger password.';
+      else if (e.response?.status === 404)        msg = 'Cannot reach the server. Make sure ngrok and the backend are running.';
+      else if (e.response?.status === 500)        msg = 'Server error. Check your backend terminal for details.';
+      else if (!e.response && e.message?.includes('Network')) msg = 'Network error. Check ngrok is running.';
+
+      Alert.alert('Registration failed', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backArrow}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create account</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+
+          <View style={styles.brandRow}>
+            <View style={styles.logoBox}>
+              <Text style={styles.logoText}>M</Text>
+            </View>
+            <View>
+              <Text style={styles.brand}>
+                Match<Text style={styles.brandAccent}>UP</Text>
+              </Text>
+              <Text style={styles.tagline}>Join the community</Text>
+            </View>
+          </View>
+
+          <View style={styles.card}>
+
+            {/* Account type */}
+            <Text style={styles.label}>I am a</Text>
+            <View style={styles.chipRow}>
+              {USER_TYPES.map(t => (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.chip, userType === t && styles.chipActive]}
+                  onPress={() => setUserType(t)}
+                >
+                  <Text style={[styles.chipText, userType === t && styles.chipTextActive]}>
+                    {t === 'coach' ? 'Coach' : 'Player'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Name */}
+            <Text style={styles.label}>Full name</Text>
+            <TextInput
+              style={styles.input}
+              value={name}
+              onChangeText={setName}
+              placeholder="Enter your name"
+              placeholderTextColor={COLORS.muted}
+              autoCapitalize="words"
+            />
+
+            {/* Email */}
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="your@email.com"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            {/* Password */}
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordWrapper}>
+              <TextInput
+                style={styles.passwordInput}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Min 6 characters"
+                placeholderTextColor={COLORS.muted}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword(v => !v)}
+                style={styles.eyeBtn}
+              >
+                <Text style={styles.eyeText}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Age */}
+            <Text style={styles.label}>Age</Text>
+            <TextInput
+              style={styles.input}
+              value={age}
+              onChangeText={setAge}
+              placeholder="Your age"
+              placeholderTextColor={COLORS.muted}
+              keyboardType="numeric"
+              maxLength={3}
+            />
+
+            {/* Gender */}
+            <Text style={styles.label}>Gender</Text>
+            <View style={styles.chipRow}>
+              {GENDERS.map(g => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, gender === g && styles.chipActive]}
+                  onPress={() => setGender(g)}
+                >
+                  <Text style={[styles.chipText, gender === g && styles.chipTextActive]}>
+                    {g}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Coach bio */}
+            {userType === 'coach' && (
+              <>
+                <Text style={styles.label}>Bio / qualifications</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={coachInfo}
+                  onChangeText={setCoachInfo}
+                  placeholder="e.g. LTA Level 3, 10 years experience, SW London"
+                  placeholderTextColor={COLORS.muted}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </>
+            )}
+
+            {/* Skill level — no emojis */}
+            <Text style={styles.label}>Skill level</Text>
+            <View style={styles.chipRow}>
+              {SKILL_LEVELS.map(s => (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.chip, skill === s && styles.chipActive]}
+                  onPress={() => setSkill(s)}
+                >
+                  <Text style={[styles.chipText, skill === s && styles.chipTextActive]}>
+                    {s}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Availability */}
+            <Text style={styles.label}>
+              Availability{'  '}
+              <Text style={styles.labelSub}>({availability.length} selected)</Text>
+            </Text>
+            <View style={styles.chipRow}>
+              {AVAILABILITY_SLOTS.map(slot => (
+                <TouchableOpacity
+                  key={slot}
+                  style={[styles.chip, availability.includes(slot) && styles.chipActive]}
+                  onPress={() => toggleSlot(slot)}
+                >
+                  <Text style={[styles.chipText, availability.includes(slot) && styles.chipTextActive]}>
+                    {slot}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Submit */}
+            <TouchableOpacity
+              style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+              onPress={register}
+              disabled={loading}
+            >
+              {loading
+                ? <ActivityIndicator color={COLORS.dark} />
+                : <Text style={styles.submitText}>Create account</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.signinRow}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.signinText}>
+                Already have an account?{'  '}
+                <Text style={styles.signinLink}>Sign in</Text>
+              </Text>
+            </TouchableOpacity>
+
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container:         { flex: 1, backgroundColor: COLORS.secondary },
+  headerBar:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.darkCard, borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30' },
+  backBtn:           { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary + '20', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.primary + '40' },
+  backArrow:         { fontSize: 20, color: COLORS.primary, fontWeight: '700' },
+  headerTitle:       { fontSize: 17, fontWeight: '800', color: COLORS.textLight },
+  scroll:            { padding: 20, paddingBottom: 50 },
+  brandRow:          { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 },
+  logoBox:           { width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  logoText:          { fontSize: 24, fontWeight: '900', color: COLORS.dark },
+  brand:             { fontSize: 24, fontWeight: '900', color: COLORS.textLight, letterSpacing: 1 },
+  brandAccent:       { color: COLORS.primary },
+  tagline:           { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  card:              { backgroundColor: COLORS.darkCard, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: COLORS.primary + '30' },
+  label:             { fontSize: 12, fontWeight: '700', color: COLORS.primary, marginBottom: 8, marginTop: 16, letterSpacing: 0.8, textTransform: 'uppercase' },
+  labelSub:          { fontSize: 11, color: COLORS.muted, fontWeight: '400', textTransform: 'none', letterSpacing: 0 },
+  input:             { backgroundColor: COLORS.secondary, borderWidth: 1, borderColor: COLORS.primary + '35', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: COLORS.textLight },
+  textArea:          { minHeight: 80, textAlignVertical: 'top' },
+  passwordWrapper:   { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.secondary, borderWidth: 1, borderColor: COLORS.primary + '35', borderRadius: 12, paddingHorizontal: 14 },
+  passwordInput:     { flex: 1, fontSize: 15, color: COLORS.textLight, paddingVertical: 12 },
+  eyeBtn:            { paddingLeft: 10, paddingVertical: 12 },
+  eyeText:           { fontSize: 13, color: COLORS.primary, fontWeight: '700' },
+  chipRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:              { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: COLORS.primary + '35', backgroundColor: COLORS.secondary },
+  chipActive:        { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText:          { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
+  chipTextActive:    { color: COLORS.dark, fontWeight: '800' },
+  submitBtn:         { backgroundColor: COLORS.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 28 },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitText:        { color: COLORS.dark, fontSize: 16, fontWeight: '900', letterSpacing: 0.5 },
+  signinRow:         { marginTop: 18, alignItems: 'center' },
+  signinText:        { fontSize: 14, color: COLORS.muted },
+  signinLink:        { color: COLORS.primary, fontWeight: '700' },
+});
+
+
+===== FILE: src\screens\main\ChatListScreen.js =====
+
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, FlatList, TouchableOpacity,
+  StyleSheet, TextInput, Modal, ScrollView, ActivityIndicator,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  collection, query, where, orderBy, onSnapshot,
+  doc, updateDoc, getDocs,
+} from 'firebase/firestore';
+import { db, auth } from '../../config/firebase';
+import { getProfile } from '../../services/api';
+import { COLORS } from '../../constants';
+
+export default function ChatListScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const [chats, setChats]             = useState([]);
+  const [search, setSearch]           = useState('');
+  const [selectedProfile, setSelectedProfile] = useState(null);
+  const [profileLoading, setProfileLoading]   = useState(false);
+  const uid = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(
+      collection(db, 'chats'),
+      where('participants', 'array-contains', uid),
+      orderBy('last_message_time', 'desc')
+    );
+    return onSnapshot(q, snap => {
+      setChats(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, []);
+
+  const getOtherName = (chat) => {
+    if (chat.names && uid && chat.names[uid]) return chat.names[uid];
+    return chat.other_name || 'Player';
+  };
+
+  // Get unread count — messages from other person not yet read
+  const getUnreadCount = (chat) => {
+    if (!chat.unread_counts) return 0;
+    return chat.unread_counts[uid] || 0;
+  };
+
+  const totalUnread = chats.reduce((sum, c) => sum + getUnreadCount(c), 0);
+
+  const filtered = chats.filter(c =>
+    getOtherName(c).toLowerCase().includes(search.toLowerCase())
+  );
+
+  // Mark chat as read — clears unread count for current user
+  const markAsRead = async (chatId) => {
+    try {
+      await updateDoc(doc(db, 'chats', chatId), {
+        [`unread_counts.${uid}`]: 0,
+      });
+    } catch (e) {
+      console.warn('Could not mark as read:', e.message);
+    }
+  };
+
+  // Load the other person's profile to show in modal
+  const openProfile = async (chat) => {
+    setProfileLoading(true);
+    setSelectedProfile({ loading: true, name: getOtherName(chat) });
+    try {
+      // Get the other participant's firebase uid
+      const otherUid = chat.participants?.find(p => p !== uid);
+      if (!otherUid) return;
+      const res = await getProfile(otherUid);
+      setSelectedProfile(res.data);
+    } catch (e) {
+      setSelectedProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const getTimeAgo = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const diff  = Date.now() - date.getTime();
+    const mins  = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days  = Math.floor(diff / 86400000);
+    if (mins < 1)   return 'now';
+    if (mins < 60)  return `${mins}m`;
+    if (hours < 24) return `${hours}h`;
+    return `${days}d`;
+  };
+
+  const AVATAR_COLORS = ['#C8F000', '#7C3AED', '#EF4444', '#F59E0B', '#10B981'];
+  const getAvatarColor = (name) => {
+    if (!name) return AVATAR_COLORS[0];
+    return AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+  };
+
+  const getInitials = (name) => {
+    if (!name) return 'P';
+    const parts = name.split(' ');
+    return parts.length > 1 ? parts[0][0] + parts[1][0] : name[0];
+  };
+
+  const getSkillEmoji = (level) => {
+    const map = { Beginner: '🌱', Intermediate: '⚡', Advanced: '🔥', Professional: '🏆' };
+    return map[level] || '🎾';
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+
+      {/* Profile modal */}
+      <Modal
+        visible={!!selectedProfile}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedProfile(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {profileLoading || selectedProfile?.loading ? (
+              <ActivityIndicator size="large" color={COLORS.primary} />
+            ) : selectedProfile ? (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {/* Avatar */}
+                <View style={styles.modalAvatarRow}>
+                  <View style={[styles.modalAvatar, { backgroundColor: getAvatarColor(selectedProfile.name) }]}>
+                    <Text style={styles.modalAvatarText}>
+                      {getInitials(selectedProfile.name).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.modalNameCol}>
+                    <Text style={styles.modalName}>{selectedProfile.name}</Text>
+                    {selectedProfile.user_type === 'coach' && (
+                      <View style={styles.coachBadge}>
+                        <Text style={styles.coachBadgeText}>Coach</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Details */}
+                <View style={styles.modalDetails}>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Skill level</Text>
+                    <Text style={styles.detailValue}>
+                      {getSkillEmoji(selectedProfile.skill_level)} {selectedProfile.skill_level}
+                    </Text>
+                  </View>
+                  {selectedProfile.age && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Age</Text>
+                      <Text style={styles.detailValue}>{selectedProfile.age}</Text>
+                    </View>
+                  )}
+                  {selectedProfile.gender && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Gender</Text>
+                      <Text style={styles.detailValue}>{selectedProfile.gender}</Text>
+                    </View>
+                  )}
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Reliability</Text>
+                    <Text style={styles.detailValue}>
+                      ⭐ {Number(selectedProfile.reliability_score ?? 5).toFixed(1)} / 5.0
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Matches played</Text>
+                    <Text style={styles.detailValue}>{selectedProfile.total_matches ?? 0}</Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Sport</Text>
+                    <Text style={styles.detailValue}>{selectedProfile.sport || 'Tennis'}</Text>
+                  </View>
+                </View>
+
+                {/* Availability */}
+                {selectedProfile.availability?.length > 0 && (
+                  <View style={styles.availSection}>
+                    <Text style={styles.availTitle}>Availability</Text>
+                    <View style={styles.availGrid}>
+                      {selectedProfile.availability.map(slot => (
+                        <View key={slot} style={styles.availChip}>
+                          <Text style={styles.availChipText}>{slot}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Coach bio */}
+                {selectedProfile.coach_info && (
+                  <View style={styles.coachInfoBox}>
+                    <Text style={styles.coachInfoLabel}>About</Text>
+                    <Text style={styles.coachInfoText}>{selectedProfile.coach_info}</Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.closeBtn}
+                  onPress={() => setSelectedProfile(null)}
+                >
+                  <Text style={styles.closeBtnText}>Close</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Messages</Text>
+          {totalUnread > 0 && (
+            <View style={styles.unreadPill}>
+              <Text style={styles.unreadPillText}>{totalUnread} new</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.searchBox}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search conversations..."
+            placeholderTextColor={COLORS.muted}
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+      </View>
+
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item.id}
+        contentContainerStyle={filtered.length === 0 && styles.emptyContainer}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => {
+          const otherName   = getOtherName(item);
+          const avatarColor = getAvatarColor(otherName);
+          const isLight     = avatarColor === '#C8F000';
+          const unread      = getUnreadCount(item);
+
+          return (
+            <View style={styles.row}>
+              {/* Tapping avatar/name opens profile */}
+              <TouchableOpacity
+                style={styles.avatarTouchable}
+                onPress={() => openProfile(item)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+                  <Text style={[styles.avatarText, { color: isLight ? COLORS.dark : COLORS.white }]}>
+                    {getInitials(otherName).toUpperCase()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Tapping the rest opens chat */}
+              <TouchableOpacity
+                style={styles.rowContent}
+                activeOpacity={0.7}
+                onPress={() => {
+                  markAsRead(item.id);
+                  navigation.navigate('ChatRoom', {
+                    chatId:    item.id,
+                    otherName: otherName,
+                  });
+                }}
+              >
+                <View style={styles.infoTop}>
+                  <TouchableOpacity onPress={() => openProfile(item)}>
+                    <Text style={[styles.name, unread > 0 && styles.nameUnread]}>
+                      {otherName}
+                    </Text>
+                  </TouchableOpacity>
+                  <Text style={styles.time}>{getTimeAgo(item.last_message_time)}</Text>
+                </View>
+                <View style={styles.infoBottom}>
+                  <Text
+                    style={[styles.preview, unread > 0 && styles.previewUnread]}
+                    numberOfLines={1}
+                  >
+                    {item.last_message || 'Tap to start chatting'}
+                  </Text>
+                  {unread > 0 && (
+                    <View style={styles.unreadBadge}>
+                      <Text style={styles.unreadBadgeText}>{unread}</Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <View style={styles.emptyIconBox}>
+              <Text style={{ fontSize: 44 }}>💬</Text>
+            </View>
+            <Text style={styles.emptyTitle}>No messages yet</Text>
+            <Text style={styles.emptySubtext}>
+              Match with a player on the Match tab and start coordinating your game
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyBtn}
+              onPress={() => navigation.navigate('Match')}
+            >
+              <Text style={styles.emptyBtnText}>Find a partner</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container:       { flex: 1, backgroundColor: COLORS.secondary },
+  header:          { backgroundColor: COLORS.darkCard, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30' },
+  headerTop:       { flexDirection: 'row', alignItems: 'center', marginBottom: 14, gap: 10 },
+  title:           { fontSize: 28, fontWeight: '900', color: COLORS.textLight },
+  unreadPill:      { backgroundColor: COLORS.danger, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
+  unreadPillText:  { color: COLORS.white, fontWeight: '800', fontSize: 12 },
+  searchBox:       { backgroundColor: COLORS.secondary, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: COLORS.primary + '30' },
+  searchInput:     { fontSize: 14, color: COLORS.textLight },
+  separator:       { height: 1, backgroundColor: COLORS.primary + '10', marginLeft: 82 },
+  row:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.darkCard },
+  avatarTouchable: { marginRight: 14 },
+  avatar:          { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
+  avatarText:      { fontSize: 18, fontWeight: '900' },
+  rowContent:      { flex: 1 },
+  infoTop:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  name:            { fontSize: 16, fontWeight: '700', color: COLORS.textLight },
+  nameUnread:      { fontWeight: '900', color: COLORS.white },
+  time:            { fontSize: 12, color: COLORS.muted },
+  infoBottom:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  preview:         { fontSize: 13, color: COLORS.muted, flex: 1, marginRight: 8 },
+  previewUnread:   { color: COLORS.textLight, fontWeight: '600' },
+  unreadBadge:     { backgroundColor: COLORS.primary, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  unreadBadgeText: { color: COLORS.dark, fontSize: 11, fontWeight: '900' },
+  emptyContainer:  { flex: 1 },
+  empty:           { alignItems: 'center', marginTop: 80, paddingHorizontal: 32 },
+  emptyIconBox:    { width: 90, height: 90, borderRadius: 45, backgroundColor: COLORS.primary + '20', alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 1, borderColor: COLORS.primary + '40' },
+  emptyTitle:      { fontSize: 22, fontWeight: '900', color: COLORS.textLight, marginBottom: 8 },
+  emptySubtext:    { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 22, marginBottom: 24 },
+  emptyBtn:        { backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  emptyBtnText:    { color: COLORS.dark, fontWeight: '800', fontSize: 15 },
+
+  // Profile modal
+  modalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalCard:       { backgroundColor: COLORS.darkCard, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%', borderWidth: 1, borderColor: COLORS.primary + '30' },
+  modalAvatarRow:  { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20 },
+  modalAvatar:     { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  modalAvatarText: { fontSize: 24, fontWeight: '900', color: COLORS.dark },
+  modalNameCol:    { flex: 1, gap: 6 },
+  modalName:       { fontSize: 22, fontWeight: '900', color: COLORS.textLight },
+  coachBadge:      { alignSelf: 'flex-start', backgroundColor: '#7C3AED' + '25', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: '#7C3AED' + '50' },
+  coachBadgeText:  { color: '#A78BFA', fontSize: 11, fontWeight: '700' },
+  modalDetails:    { gap: 12, marginBottom: 20 },
+  detailRow:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.primary + '15' },
+  detailLabel:     { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
+  detailValue:     { fontSize: 14, color: COLORS.textLight, fontWeight: '700' },
+  availSection:    { marginBottom: 16 },
+  availTitle:      { fontSize: 12, color: COLORS.primary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  availGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  availChip:       { backgroundColor: COLORS.secondary, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: COLORS.primary + '30' },
+  availChipText:   { fontSize: 11, color: COLORS.primary, fontWeight: '600' },
+  coachInfoBox:    { backgroundColor: '#7C3AED' + '15', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: '#7C3AED' + '30' },
+  coachInfoLabel:  { fontSize: 10, color: '#A78BFA', fontWeight: '700', textTransform: 'uppercase', marginBottom: 6 },
+  coachInfoText:   { fontSize: 13, color: COLORS.muted, lineHeight: 20 },
+  closeBtn:        { backgroundColor: COLORS.primary, borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 8, marginBottom: 20 },
+  closeBtnText:    { color: COLORS.dark, fontWeight: '900', fontSize: 15 },
+});
+
+
+===== FILE: src\screens\main\ChatRoomScreen.js =====
+
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, FlatList,
+  StyleSheet, KeyboardAvoidingView, SafeAreaView, Alert,
+} from 'react-native';
+import {
+  collection, addDoc, query, orderBy,
+  onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc,
+} from 'firebase/firestore';
+import { db, auth } from '../../config/firebase';
+import { COLORS } from '../../constants';
+
+export default function ChatRoomScreen({ route, navigation }) {
+  const { chatId, otherName } = route.params;
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState('');
+  const uid = auth.currentUser?.uid;
+
+  // Set header title
+  useEffect(() => {
+    navigation.setOptions({
+      title: otherName,
+      headerStyle:      { backgroundColor: COLORS.darkCard },
+      headerTintColor:  COLORS.textLight,
+      headerTitleStyle: { fontWeight: '800' },
+    });
+  }, [otherName]);
+
+  // Listen to messages
+  useEffect(() => {
+    if (!chatId) return;
+    const q = query(
+      collection(db, 'chats', chatId, 'messages'),
+      orderBy('timestamp', 'desc')
+    );
+    return onSnapshot(q, snap => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+  }, [chatId]);
+
+  // Clear unread count for current user when chat is opened
+  useEffect(() => {
+    if (!chatId || !uid) return;
+    updateDoc(doc(db, 'chats', chatId), {
+      [`unread_counts.${uid}`]: 0,
+    }).catch(() => {});
+  }, [chatId, uid]);
+
+  const send = async () => {
+    if (!text.trim() || !chatId) return;
+    const msg = text.trim();
+    setText('');
+
+    try {
+      // Save the message
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        text:      msg,
+        sender_id: uid,
+        timestamp: serverTimestamp(),
+      });
+
+      // Get chat doc to find the other participant
+      const chatRef  = doc(db, 'chats', chatId);
+      const chatSnap = await getDoc(chatRef);
+      const chatData = chatSnap.data() || {};
+      const participants = chatData.participants || [];
+      const otherUid = participants.find(p => p !== uid);
+
+      // Build update — last message + increment other person's unread count
+      const updateData = {
+        last_message:      msg,
+        last_message_time: serverTimestamp(),
+        last_sender_id:    uid,
+      };
+
+      if (otherUid) {
+        const currentUnread = chatData.unread_counts?.[otherUid] || 0;
+        updateData[`unread_counts.${otherUid}`] = currentUnread + 1;
+      }
+
+      await updateDoc(chatRef, updateData);
+
+    } catch (e) {
+      console.error('Send error:', e.message);
+    }
+  };
+
+  const confirmDelete = (messageId, senderId) => {
+    if (senderId !== uid) {
+      Alert.alert('Cannot delete', 'You can only delete your own messages.');
+      return;
+    }
+    Alert.alert(
+      'Delete message',
+      'Are you sure you want to delete this message?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text:    'Delete',
+          style:   'destructive',
+          onPress: () => deleteMessage(messageId),
+        },
+      ]
+    );
+  };
+
+  const deleteMessage = async (messageId) => {
+    try {
+      await deleteDoc(doc(db, 'chats', chatId, 'messages', messageId));
+
+      const remaining = messages.filter(m => m.id !== messageId);
+      const chatRef   = doc(db, 'chats', chatId);
+
+      if (remaining.length > 0) {
+        await updateDoc(chatRef, {
+          last_message:      remaining[0].text || '',
+          last_message_time: remaining[0].timestamp || serverTimestamp(),
+          last_sender_id:    remaining[0].sender_id || uid,
+        });
+      } else {
+        await updateDoc(chatRef, {
+          last_message:      '',
+          last_message_time: serverTimestamp(),
+          last_sender_id:    uid,
+        });
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Could not delete message.');
+    }
+  };
+
+  const getTimeLabel = (timestamp) => {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now  = new Date();
+    const diff = now - date;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1)  return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 24) return `${hours}h ago`;
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior="padding"
+        keyboardVerticalOffset={90}
+      >
+        <FlatList
+          data={messages}
+          keyExtractor={item => item.id}
+          inverted
+          contentContainerStyle={{ padding: 16 }}
+          renderItem={({ item }) => {
+            const isMe = item.sender_id === uid;
+            return (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onLongPress={() => confirmDelete(item.id, item.sender_id)}
+              >
+                <View style={[
+                  styles.bubbleWrapper,
+                  isMe ? styles.bubbleWrapperMe : styles.bubbleWrapperThem,
+                ]}>
+                  <View style={[
+                    styles.bubble,
+                    isMe ? styles.bubbleMe : styles.bubbleThem,
+                  ]}>
+                    <Text style={[
+                      styles.bubbleText,
+                      isMe && styles.bubbleTextMe,
+                    ]}>
+                      {item.text}
+                    </Text>
+                  </View>
+                  <Text style={[
+                    styles.timeLabel,
+                    isMe && styles.timeLabelMe,
+                  ]}>
+                    {getTimeLabel(item.timestamp)}
+                    {isMe && '  hold to delete'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          ListEmptyComponent={
+            <View style={styles.emptyChat}>
+              <View style={styles.emptyChatIcon}>
+                <Text style={styles.emptyChatIconText}>💬</Text>
+              </View>
+              <Text style={styles.emptyChatTitle}>
+                Say hello to {otherName}!
+              </Text>
+              <Text style={styles.emptyChatSub}>
+                Start coordinating your match
+              </Text>
+            </View>
+          }
+        />
+
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="Type a message..."
+            placeholderTextColor={COLORS.muted}
+            onSubmitEditing={send}
+            multiline
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, !text.trim() && styles.sendBtnDisabled]}
+            onPress={send}
+            disabled={!text.trim()}
+          >
+            <Text style={styles.sendIcon}>➤</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe:      { flex: 1, backgroundColor: COLORS.secondary },
+  container: { flex: 1 },
+
+  bubbleWrapper:     { marginBottom: 10 },
+  bubbleWrapperMe:   { alignItems: 'flex-end' },
+  bubbleWrapperThem: { alignItems: 'flex-start' },
+
+  bubble: {
+    maxWidth: '75%',
+    padding: 12,
+    borderRadius: 18,
+  },
+  bubbleMe: {
+    backgroundColor: '#ecf0f6',
+    borderBottomRightRadius: 4,
+    borderWidth: 1,
+    borderColor: '#271b5d',
+  },
+  bubbleThem: {
+    backgroundColor: '#271b5d',
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#3d2a7a',
+  },
+  bubbleText:    { fontSize: 15, color: '#ecf0f6' },
+  bubbleTextMe:  { color: COLORS.dark, fontWeight: '600' },
+
+  timeLabel: {
+    fontSize: 10,
+    color: COLORS.muted,
+    marginTop: 3,
+    marginLeft: 4,
+  },
+  timeLabelMe: {
+    marginLeft: 0,
+    marginRight: 4,
+    textAlign: 'right',
+  },
+
+  emptyChat: {
+    alignItems: 'center',
+    marginTop: 60,
+    paddingHorizontal: 32,
+  },
+  emptyChatIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '40',
+  },
+  emptyChatIconText: { fontSize: 32 },
+  emptyChatTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: COLORS.textLight,
+    marginBottom: 6,
+  },
+  emptyChatSub: {
+    fontSize: 13,
+    color: COLORS.muted,
+    textAlign: 'center',
+  },
+
+  inputRow: {
+    flexDirection: 'row',
+    padding: 12,
+    backgroundColor: COLORS.darkCard,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.primary + '30',
+    gap: 10,
+    alignItems: 'flex-end',
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '40',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: COLORS.textLight,
+    backgroundColor: COLORS.secondary,
+    maxHeight: 100,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: { backgroundColor: COLORS.primary + '40' },
+  sendIcon: { color: COLORS.dark, fontSize: 16, fontWeight: '900' },
+});
+
+
+===== FILE: src\screens\main\MapScreen.js =====
+
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, TextInput, Linking,
+  ActivityIndicator
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Location from 'expo-location';
+import { COLORS, GOOGLE_API_KEY } from '../../constants';
+
+const CATEGORIES = [
+  { id: 'courts', label: 'Courts', query: 'tennis court london' },
+  { id: 'clubs', label: 'Clubs', query: 'tennis club london' },
+  { id: 'coaches', label: 'Coaches', query: 'tennis coach london' },
+];
+
+const FALLBACK = {
+  courts: [
+    { place_id: '1', name: "Regent's Park Tennis", vicinity: "Regent's Park, NW1 4NR", rating: 4.5, open: true, bookUrl: 'https://www.better.org.uk/leisure-centre/london/the-hub-at-st-james-s-park/tennis' },
+    { place_id: '2', name: 'Hyde Park Tennis', vicinity: 'Hyde Park, W2 2UH', rating: 4.3, open: true, bookUrl: 'https://www.royalparks.org.uk/parks/hyde-park/things-to-do-in-hyde-park/sports-and-activities/tennis' },
+    { place_id: '3', name: 'Victoria Park Tennis', vicinity: 'Victoria Park, E9 7DE', rating: 4.6, open: false, bookUrl: 'https://www.better.org.uk' },
+    { place_id: '4', name: 'Battersea Park Courts', vicinity: 'Battersea Park, SW11 4NJ', rating: 4.4, open: true, bookUrl: 'https://www.wandsworth.gov.uk/tennis' },
+    { place_id: '5', name: 'Finsbury Park Tennis', vicinity: 'Finsbury Park, N4 2NQ', rating: 4.2, open: true, bookUrl: 'https://www.better.org.uk' },
+  ],
+  clubs: [
+    { place_id: '6', name: 'Queens Club', vicinity: 'West Kensington, W14 9EG', rating: 4.8, open: true, bookUrl: 'https://www.queensclub.co.uk' },
+    { place_id: '7', name: 'Roehampton Club', vicinity: 'Roehampton, SW15 5LR', rating: 4.7, open: true, bookUrl: 'https://www.roehamptonclub.co.uk' },
+    { place_id: '8', name: 'Wimbledon Club', vicinity: 'Wimbledon, SW19 5AE', rating: 4.9, open: true, bookUrl: 'https://www.wimbledon.com' },
+    { place_id: '9', name: 'David Lloyd Chiswick', vicinity: 'Chiswick, W4 5YE', rating: 4.5, open: true, bookUrl: 'https://www.davidlloyd.co.uk' },
+  ],
+  coaches: [
+    { place_id: '10', name: 'LTA Licensed Coaches', vicinity: 'London Wide', rating: 4.8, open: true, bookUrl: 'https://www.lta.org.uk/play/find-a-coach' },
+    { place_id: '11', name: 'Tennis For Free Coaches', vicinity: 'London Parks', rating: 4.6, open: true, bookUrl: 'https://www.tennisforfree.com' },
+    { place_id: '12', name: 'Urban Tennis Coaches', vicinity: 'Central London', rating: 4.7, open: true, bookUrl: 'https://www.urbantennis.co.uk' },
+  ],
+};
+
+export default function MapScreen() {
+  const insets = useSafeAreaInsets();
+  const [location, setLocation] = useState(null);
+  const [places, setPlaces] = useState(FALLBACK.courts);
+  const [loading, setLoading] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('courts');
+  const [searchText, setSearchText] = useState('');
+  const [postcode, setPostcode] = useState('');
+
+  useEffect(() => {
+    getLocation();
+  }, []);
+
+  const getLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setPlaces(FALLBACK.courts);
+      return;
+    }
+    const loc = await Location.getCurrentPositionAsync({});
+    setLocation(loc.coords);
+    await fetchNearbyPlaces('tennis court', loc.coords);
+  };
+
+  const fetchNearbyPlaces = async (keyword, coords) => {
+    if (!GOOGLE_API_KEY || GOOGLE_API_KEY === 'YOUR_GOOGLE_API_KEY_HERE') {
+      setPlaces(FALLBACK[activeCategory] || FALLBACK.courts);
+      return;
+    }
+    setLoading(true);
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${coords.latitude},${coords.longitude}&radius=5000&keyword=${encodeURIComponent(keyword)}&key=${GOOGLE_API_KEY}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        setPlaces(data.results.slice(0, 10));
+      } else {
+        setPlaces(FALLBACK[activeCategory] || FALLBACK.courts);
+      }
+    } catch (e) {
+      setPlaces(FALLBACK[activeCategory] || FALLBACK.courts);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const searchByPostcode = async () => {
+    if (!postcode.trim()) return;
+    setLoading(true);
+    try {
+      const geoUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(postcode + ' UK')}&key=${GOOGLE_API_KEY}`;
+      const geoRes = await fetch(geoUrl);
+      const geoData = await geoRes.json();
+      if (geoData.results && geoData.results[0]) {
+        const loc = geoData.results[0].geometry.location;
+        await fetchNearbyPlaces(
+          CATEGORIES.find(c => c.id === activeCategory)?.query || 'tennis court',
+          { latitude: loc.lat, longitude: loc.lng }
+        );
+      }
+    } catch (e) {
+      setPlaces(FALLBACK[activeCategory] || FALLBACK.courts);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategory = async (cat) => {
+    setActiveCategory(cat.id);
+    setPlaces(FALLBACK[cat.id] || FALLBACK.courts);
+    if (location) {
+      await fetchNearbyPlaces(cat.query, location);
+    }
+  };
+
+  const openDirections = (place) => {
+    const name = encodeURIComponent(place.name);
+    const vicinity = encodeURIComponent(place.vicinity || '');
+    Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${name}+${vicinity}`);
+  };
+
+  const openBooking = (place) => {
+    if (place.bookUrl) {
+      Linking.openURL(place.bookUrl);
+    } else {
+      const query = encodeURIComponent(`book ${place.name} tennis`);
+      Linking.openURL(`https://www.google.com/search?q=${query}`);
+    }
+  };
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Find Nearby</Text>
+        <Text style={styles.subtitle}>
+          {location ? '📍 Using your location' : '📍 Getting location...'}
+        </Text>
+      </View>
+
+      <View style={styles.postcodeRow}>
+        <TextInput
+          style={styles.postcodeInput}
+          placeholder="Enter postcode (e.g. SW1A 1AA)"
+          placeholderTextColor={COLORS.muted}
+          value={postcode}
+          onChangeText={setPostcode}
+          onSubmitEditing={searchByPostcode}
+          returnKeyType="search"
+          autoCapitalize="characters"
+        />
+        <TouchableOpacity style={styles.searchBtn} onPress={searchByPostcode}>
+          <Text style={styles.searchBtnText}>🔍</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.categoryRow}>
+        {CATEGORIES.map(cat => (
+          <TouchableOpacity
+            key={cat.id}
+            style={[styles.catChip, activeCategory === cat.id && styles.catChipActive]}
+            onPress={() => handleCategory(cat)}>
+            <Text style={[styles.catText, activeCategory === cat.id && styles.catTextActive]}>
+              {cat.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {loading
+        ? <ActivityIndicator size="large" color={COLORS.primary} style={{ marginTop: 40 }} />
+        : (
+          <ScrollView contentContainerStyle={styles.list}>
+            {places.map((place, index) => (
+              <View key={place.place_id || index} style={styles.card}>
+                <Text style={styles.placeName}>{place.name}</Text>
+                <Text style={styles.placeAddress}>
+                  📍 {place.vicinity || place.formatted_address || 'London'}
+                </Text>
+                <View style={styles.metaRow}>
+                  {place.rating && (
+                    <Text style={styles.rating}>⭐ {place.rating}</Text>
+                  )}
+                  {(place.open !== undefined || place.opening_hours) && (
+                    <Text style={[styles.openStatus, {
+                      color: (place.open || place.opening_hours?.open_now)
+                        ? COLORS.primary : COLORS.danger
+                    }]}>
+                      {(place.open || place.opening_hours?.open_now) ? '● Open' : '● Closed'}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.cardActions}>
+                  <TouchableOpacity
+                    style={styles.dirBtn}
+                    onPress={() => openDirections(place)}>
+                    <Text style={styles.dirBtnText}>🗺️ Directions</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.bookBtn}
+                    onPress={() => openBooking(place)}>
+                    <Text style={styles.bookBtnText}>📅 Book</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: COLORS.secondary },
+  header: {
+    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12,
+    backgroundColor: COLORS.darkCard,
+    borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30',
+  },
+  title: { fontSize: 24, fontWeight: '900', color: COLORS.textLight },
+  subtitle: { fontSize: 13, color: COLORS.muted, marginTop: 2 },
+  postcodeRow: {
+    flexDirection: 'row', padding: 12,
+    backgroundColor: COLORS.darkCard, gap: 10,
+  },
+  postcodeInput: {
+    flex: 1, backgroundColor: COLORS.secondary,
+    borderWidth: 1, borderColor: COLORS.primary + '40',
+    borderRadius: 12, paddingHorizontal: 14,
+    paddingVertical: 10, fontSize: 14, color: COLORS.textLight,
+  },
+  searchBtn: {
+    backgroundColor: COLORS.primary, borderRadius: 12,
+    width: 44, height: 44,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  searchBtnText: { fontSize: 18 },
+  categoryRow: {
+    flexDirection: 'row', paddingHorizontal: 16,
+    paddingBottom: 12, paddingTop: 8,
+    backgroundColor: COLORS.darkCard, gap: 8,
+    borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30',
+  },
+  catChip: {
+    paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 20, borderWidth: 1.5,
+    borderColor: COLORS.primary + '40',
+  },
+  catChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  catText: { fontSize: 13, color: COLORS.muted, fontWeight: '600' },
+  catTextActive: { color: COLORS.dark, fontWeight: '800' },
+  list: { padding: 16, paddingBottom: 32 },
+  card: {
+    backgroundColor: COLORS.darkCard, borderRadius: 16,
+    padding: 16, marginBottom: 12,
+    borderWidth: 1, borderColor: COLORS.primary + '25',
+  },
+  placeName: { fontSize: 16, fontWeight: '800', color: COLORS.textLight, marginBottom: 4 },
+  placeAddress: { fontSize: 13, color: COLORS.muted, marginBottom: 6 },
+  metaRow: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  rating: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
+  openStatus: { fontSize: 12, fontWeight: '700' },
+  cardActions: { flexDirection: 'row', gap: 10 },
+  dirBtn: {
+    flex: 1, borderWidth: 1.5,
+    borderColor: COLORS.primary + '60',
+    borderRadius: 10, padding: 10, alignItems: 'center',
+  },
+  dirBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: 13 },
+  bookBtn: {
+    flex: 1, backgroundColor: COLORS.primary,
+    borderRadius: 10, padding: 10, alignItems: 'center',
+  },
+  bookBtnText: { color: COLORS.dark, fontWeight: '800', fontSize: 13 },
+});
+
+
+===== FILE: src\screens\main\MatchScreen.js =====
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, FlatList, StyleSheet,
+  TouchableOpacity, ActivityIndicator, RefreshControl, ScrollView,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth } from '../../config/firebase';
+import { getSuggestions, getPendingMatches } from '../../services/api';
+import PlayerCard from '../../components/PlayerCard';
+import { COLORS, SKILL_LEVELS } from '../../constants';
+
+const FILTERS = ['All', ...SKILL_LEVELS];
+
+export default function MatchScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const [allPlayers, setAllPlayers]     = useState([]);
+  const [displayed, setDisplayed]       = useState([]);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [pendingCount, setPendingCount] = useState(0);
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [error, setError]               = useState(null);
+
+  const load = useCallback(async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    setError(null);
+    try {
+      const [sRes, pRes] = await Promise.all([
+        getSuggestions(uid),
+        getPendingMatches(uid),
+      ]);
+
+      const players = sRes.data ?? [];
+      setAllPlayers(players);
+      applyFilter(activeFilter, players);
+      setPendingCount(pRes.data?.length ?? 0);
+    } catch (e) {
+      setError('Could not load players. Is your backend running?');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const applyFilter = (filter, source) => {
+    const list = source ?? allPlayers;
+    setActiveFilter(filter);
+    if (filter === 'All') {
+      setDisplayed(list);
+    } else {
+      setDisplayed(list.filter(p => p.skill_level === filter));
+    }
+  };
+
+  const removePlayer = (playerId) => {
+    const updated = allPlayers.filter(p => p.id !== playerId);
+    setAllPlayers(updated);
+    applyFilter(activeFilter, updated);
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Finding players near you...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>Ready to play? 🎾</Text>
+            <Text style={styles.title}>Find a partner</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.notifBtn}
+            onPress={() => navigation.navigate('Pending Matches')}
+          >
+            <Text style={styles.notifIcon}>🔔</Text>
+            {pendingCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{pendingCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* Filter chips */}
+        <Text style={styles.filterLabel}>Filter by skill level</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {FILTERS.map(filter => (
+            <TouchableOpacity
+              key={filter}
+              style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+              onPress={() => applyFilter(filter, allPlayers)}
+            >
+              <Text style={[
+                styles.filterChipText,
+                activeFilter === filter && styles.filterChipTextActive,
+              ]}>
+                {filter}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Error banner */}
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={() => { setLoading(true); load(); }}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Player list */}
+      <FlatList
+        data={displayed}
+        keyExtractor={item => String(item.id)}
+        renderItem={({ item }) => (
+          <PlayerCard
+            player={item}
+            onMatch={() => removePlayer(item.id)}
+          />
+        )}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => { setRefreshing(true); load(); }}
+            tintColor={COLORS.primary}
+          />
+        }
+        contentContainerStyle={[
+          styles.listContent,
+          displayed.length === 0 && styles.listEmpty,
+        ]}
+        ListEmptyComponent={
+          !error && (
+            <View style={styles.empty}>
+              <View style={styles.emptyBall}>
+                <Text style={styles.emptyIcon}>🎾</Text>
+              </View>
+              <Text style={styles.emptyTitle}>
+                {allPlayers.length === 0
+                  ? 'No players registered yet'
+                  : `No ${activeFilter !== 'All' ? activeFilter : ''} players found`}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {allPlayers.length === 0
+                  ? 'Register a few test accounts to see players appear here'
+                  : 'Try a different skill level filter or pull down to refresh'}
+              </Text>
+            </View>
+          )
+        }
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.secondary,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.secondary,
+    gap: 12,
+  },
+  loadingText: {
+    color: COLORS.muted,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  header: {
+    backgroundColor: COLORS.darkCard,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.primary + '30',
+    paddingTop: 12,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  greeting: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: COLORS.textLight,
+    letterSpacing: 0.5,
+  },
+  notifBtn: {
+    backgroundColor: COLORS.primary + '15',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '30',
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifIcon: { fontSize: 20 },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: COLORS.danger,
+    borderRadius: 10,
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: COLORS.white, fontSize: 10, fontWeight: 'bold' },
+  filterLabel: {
+    fontSize: 11,
+    color: COLORS.muted,
+    fontWeight: '600',
+    marginBottom: 10,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary + '40',
+    backgroundColor: 'transparent',
+  },
+  filterChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  filterChipText: {
+    fontSize: 13,
+    color: COLORS.muted,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: COLORS.dark,
+    fontWeight: '800',
+  },
+  errorBanner: {
+    backgroundColor: COLORS.danger + '20',
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.danger + '40',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  errorText: { color: COLORS.danger, fontSize: 13, flex: 1 },
+  retryText: { color: COLORS.primary, fontWeight: '700', fontSize: 13, marginLeft: 12 },
+  listContent: {
+    padding: 16,
+    paddingBottom: 32,
+  },
+  listEmpty: {
+    flexGrow: 1,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 32,
+  },
+  emptyBall: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '40',
+  },
+  emptyIcon: { fontSize: 40 },
+  emptyTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: COLORS.textLight,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 13,
+    color: COLORS.muted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});
+
+
+===== FILE: src\screens\main\ProfileScreen.js =====
+
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity,
+  StyleSheet, ScrollView, Alert, ActivityIndicator
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../config/firebase';
+import { getProfile, updateProfile } from '../../services/api';
+import { COLORS, SKILL_LEVELS, AVAILABILITY_SLOTS } from '../../constants';
+
+const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'];
+
+export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+  const [profile, setProfile]           = useState(null);
+  const [name, setName]                 = useState('');
+  const [age, setAge]                   = useState('');
+  const [gender, setGender]             = useState('');
+  const [skill, setSkill]               = useState(SKILL_LEVELS[0]);
+  const [availability, setAvailability] = useState([]);
+  const [radius, setRadius]             = useState('10');
+  const [coachInfo, setCoachInfo]       = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [saving, setSaving]             = useState(false);
+  const [error, setError]               = useState(null);
+
+  const load = useCallback(async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) { setLoading(false); return; }
+    try {
+      setError(null);
+      const res = await getProfile(uid);
+      const p   = res.data;
+      setProfile(p);
+      setName(p.name || '');
+      setAge(p.age ? String(p.age) : '');
+      setGender(p.gender || '');
+      setSkill(p.skill_level || SKILL_LEVELS[0]);
+      setAvailability(p.availability || []);
+      setRadius(String(p.radius_km || 10));
+      setCoachInfo(p.coach_info || '');
+    } catch (e) {
+      setError('Could not load profile. Check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleSlot = (slot) =>
+    setAvailability(prev =>
+      prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot]
+    );
+
+  const save = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    if (age && (isNaN(Number(age)) || Number(age) < 13 || Number(age) > 100)) {
+      Alert.alert('Invalid age', 'Please enter a valid age (13-100).');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateProfile(uid, {
+        name,
+        skill_level:  skill,
+        availability,
+        radius_km:    parseInt(radius),
+        age:          age ? parseInt(age) : null,
+        gender:       gender || null,
+        coach_info:   profile?.user_type === 'coach' ? coachInfo : null,
+      });
+      Alert.alert('Saved', 'Profile updated successfully');
+    } catch (e) {
+      Alert.alert('Error', 'Could not save. Check your connection.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => signOut(auth) },
+    ]);
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={load}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const isCoach = profile?.user_type === 'coach';
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.title}>My Profile</Text>
+          <Text style={styles.subtitle}>{auth.currentUser?.email}</Text>
+        </View>
+        {isCoach && (
+          <View style={styles.coachBadge}>
+            <Text style={styles.coachBadgeText}>Coach</Text>
+          </View>
+        )}
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {/* Stats card */}
+        {profile && (
+          <View style={styles.scoreCard}>
+            <View style={styles.scoreLeft}>
+              <View style={styles.scoreIconBox}>
+                <Text style={styles.scoreStar}>★</Text>
+              </View>
+              <View>
+                <Text style={styles.scoreLabel}>Reliability score</Text>
+                <Text style={styles.scoreValue}>
+                  {Number(profile.reliability_score).toFixed(1)}
+                  <Text style={styles.scoreMax}> / 5.0</Text>
+                </Text>
+                <Text style={styles.scoreHint}>Updated after each rated match</Text>
+              </View>
+            </View>
+            <View style={styles.matchesBadge}>
+              <Text style={styles.matchesNum}>{profile.total_matches}</Text>
+              <Text style={styles.matchesLabel}>matches</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Name */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Name</Text>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Your name"
+            placeholderTextColor={COLORS.muted}
+          />
+        </View>
+
+        {/* Age */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Age</Text>
+          <TextInput
+            style={styles.input}
+            value={age}
+            onChangeText={setAge}
+            placeholder="Your age"
+            placeholderTextColor={COLORS.muted}
+            keyboardType="numeric"
+            maxLength={3}
+          />
+        </View>
+
+        {/* Gender */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Gender</Text>
+          <View style={styles.chipRow}>
+            {GENDERS.map(g => (
+              <TouchableOpacity
+                key={g}
+                style={[styles.chip, gender === g && styles.chipActive]}
+                onPress={() => setGender(g)}
+              >
+                <Text style={[styles.chipText, gender === g && styles.chipTextActive]}>
+                  {g}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Skill level/}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Skill level</Text>
+          <View style={styles.chipRow}>
+            {SKILL_LEVELS.map(s => (
+              <TouchableOpacity
+                key={s}
+                style={[styles.chip, skill === s && styles.chipActive]}
+                onPress={() => setSkill(s)}
+              >
+                <Text style={[styles.chipText, skill === s && styles.chipTextActive]}>
+                  {s}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Search radius */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Search radius</Text>
+          <View style={styles.chipRow}>
+            {['5', '10', '15', '20', '30'].map(r => (
+              <TouchableOpacity
+                key={r}
+                style={[styles.chip, radius === r && styles.chipActive]}
+                onPress={() => setRadius(r)}
+              >
+                <Text style={[styles.chipText, radius === r && styles.chipTextActive]}>
+                  {r} km
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Availability */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>
+            Availability
+            <Text style={styles.sectionSub}>  ({availability.length} selected)</Text>
+          </Text>
+          <View style={styles.chipRow}>
+            {AVAILABILITY_SLOTS.map(slot => (
+              <TouchableOpacity
+                key={slot}
+                style={[styles.chip, availability.includes(slot) && styles.chipActive]}
+                onPress={() => toggleSlot(slot)}
+              >
+                <Text style={[styles.chipText, availability.includes(slot) && styles.chipTextActive]}>
+                  {slot}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Coach bio */}
+        {isCoach && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Bio / qualifications</Text>
+            <TextInput
+              style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+              value={coachInfo}
+              onChangeText={setCoachInfo}
+              placeholder="e.g. LTA Level 3, 10 years experience, SW London"
+              placeholderTextColor={COLORS.muted}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+        )}
+
+        {/* Save */}
+        <TouchableOpacity
+          style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+          onPress={save}
+          disabled={saving}
+        >
+          {saving
+            ? <ActivityIndicator color={COLORS.dark} />
+            : <Text style={styles.saveBtnText}>Save changes</Text>
+          }
+        </TouchableOpacity>
+
+        {/* Sign out */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
+          <Text style={styles.logoutText}>Sign out</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container:      { flex: 1, backgroundColor: COLORS.secondary },
+  center:         { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.secondary, gap: 8 },
+  loadingText:    { color: COLORS.muted, fontSize: 14, fontWeight: '600', marginTop: 12 },
+  errorText:      { color: COLORS.danger, fontSize: 15, textAlign: 'center', marginBottom: 16 },
+  retryBtn:       { backgroundColor: COLORS.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 12 },
+  retryText:      { color: COLORS.dark, fontWeight: '800' },
+  header:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, backgroundColor: COLORS.darkCard, borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30' },
+  title:          { fontSize: 24, fontWeight: '900', color: COLORS.textLight },
+  subtitle:       { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  coachBadge:     { backgroundColor: '#7C3AED' + '25', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4, borderWidth: 1, borderColor: '#7C3AED' + '50' },
+  coachBadgeText: { color: '#A78BFA', fontSize: 12, fontWeight: '700' },
+  scrollContent:  { padding: 20, paddingBottom: 60 },
+  scoreCard:      { backgroundColor: COLORS.darkCard, borderRadius: 16, padding: 16, marginBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: COLORS.primary + '40' },
+  scoreLeft:      { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  scoreIconBox:   { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primary + '20', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.primary + '40' },
+  scoreStar:      { fontSize: 22, color: COLORS.primary, fontWeight: '900' },
+  scoreLabel:     { fontSize: 12, color: COLORS.muted, marginBottom: 2 },
+  scoreValue:     { fontSize: 22, fontWeight: '900', color: COLORS.primary },
+  scoreMax:       { fontSize: 13, color: COLORS.muted, fontWeight: '400' },
+  scoreHint:      { fontSize: 10, color: COLORS.muted, marginTop: 2 },
+  matchesBadge:   { backgroundColor: COLORS.secondary, borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: COLORS.primary + '30' },
+  matchesNum:     { fontSize: 20, fontWeight: '900', color: COLORS.textLight },
+  matchesLabel:   { fontSize: 11, color: COLORS.muted, marginTop: 2 },
+  section:        { marginBottom: 20 },
+  sectionLabel:   { fontSize: 12, fontWeight: '700', color: COLORS.primary, marginBottom: 10, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionSub:     { fontSize: 11, color: COLORS.muted, fontWeight: '400', textTransform: 'none', letterSpacing: 0 },
+  input:          { backgroundColor: COLORS.darkCard, borderWidth: 1, borderColor: COLORS.primary + '40', borderRadius: 12, padding: 14, fontSize: 15, color: COLORS.textLight },
+  chipRow:        { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip:           { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5, borderColor: COLORS.primary + '40', backgroundColor: COLORS.secondary },
+  chipActive:     { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText:       { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
+  chipTextActive: { color: COLORS.dark, fontWeight: '800' },
+  saveBtn:        { backgroundColor: COLORS.primary, borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 12 },
+  saveBtnText:    { color: COLORS.dark, fontSize: 16, fontWeight: '900' },
+  logoutBtn:      { borderWidth: 1.5, borderColor: COLORS.danger, borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 40 },
+  logoutText:     { color: COLORS.danger, fontSize: 16, fontWeight: '700' },
+});
+
+
+===== FILE: src\screens\main\ScheduleScreen.js =====
+
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, FlatList, TouchableOpacity, StyleSheet,
+  Alert, SafeAreaView, ActivityIndicator, Modal, ScrollView,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { auth } from '../../config/firebase';
+import { scheduleMatch, rateMatch, getProfile } from '../../services/api';
+import { COLORS, API_URL } from '../../constants';
+import axios from 'axios';
+
+const TIMES = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+
+// Parse availability slots like "Monday AM" or "Saturday PM"
+// Returns array of day strings the person is available
+function getAvailableDays(availability) {
+  if (!Array.isArray(availability)) return [];
+  const days = new Set();
+  availability.forEach(slot => {
+    const parts = slot.split(' ');
+    const day = parts.slice(0, -1).join(' ');
+    if (day) days.add(day);
+  });
+  return Array.from(days);
+}
+
+// Get AM/PM slots for a specific day
+function getTimesForDay(availability, day) {
+  if (!Array.isArray(availability)) return { AM: false, PM: false };
+  const slots = availability.filter(s => s.startsWith(day));
+  return {
+    AM: slots.some(s => s.endsWith('AM')),
+    PM: slots.some(s => s.endsWith('PM')),
+  };
+}
+
+// Filter times based on AM/PM availability
+function getAvailableTimes(availability, day) {
+  const { AM, PM } = getTimesForDay(availability, day);
+  return TIMES.filter(t => {
+    const hour = parseInt(t.split(':')[0]);
+    if (AM && hour >= 6  && hour < 13) return true;
+    if (PM && hour >= 13 && hour < 22) return true;
+    return false;
+  });
+}
+
+export default function ScheduleScreen() {
+  const insets = useSafeAreaInsets();
+  const [matches, setMatches]           = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [scheduling, setScheduling]     = useState(null);
+  const [ratingMatch, setRatingMatch]   = useState(null);
+  const [selectedDay, setSelectedDay]   = useState(null);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [selectedRating, setSelectedRating] = useState(0);
+  const [otherAvailability, setOtherAvailability] = useState([]);
+  const [loadingAvail, setLoadingAvail] = useState(false);
+
+  const load = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const api = axios.create({
+        baseURL: API_URL,
+        timeout: 10000,
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      const token = await auth.currentUser.getIdToken();
+      const res = await api.get(`/matches/accepted/${uid}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMatches(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  // When opening schedule modal, load the other person's availability
+  const openSchedule = async (item) => {
+    setSelectedDay(null);
+    setSelectedTime(null);
+    setOtherAvailability([]);
+    setScheduling(item);
+    setLoadingAvail(true);
+    try {
+      // other_user_id is the postgres integer id of the other person
+      const res = await getProfile(String(item.other_user_id));
+      setOtherAvailability(res.data?.availability || []);
+    } catch (e) {
+      console.warn('Could not load other availability:', e.message);
+      setOtherAvailability([]);
+    } finally {
+      setLoadingAvail(false);
+    }
+  };
+
+  const confirmSchedule = async () => {
+    if (!selectedDay || !selectedTime || !scheduling) return;
+    const scheduledTime = `${selectedDay} at ${selectedTime}`;
+    try {
+      await scheduleMatch(scheduling.id, { scheduled_time: scheduledTime, court_name: '' });
+      setMatches(prev => prev.map(m =>
+        m.id === scheduling.id ? { ...m, scheduled_time: scheduledTime } : m
+      ));
+      Alert.alert('Scheduled!', `Match set for ${scheduledTime}`);
+      setScheduling(null);
+      setSelectedDay(null);
+      setSelectedTime(null);
+    } catch (e) {
+      Alert.alert('Error', 'Could not schedule. Try again.');
+    }
+  };
+
+  const submitRating = async () => {
+    if (!selectedRating || !ratingMatch) return;
+    const uid = auth.currentUser?.uid;
+    const ratedId = ratingMatch.requester_id === uid
+      ? ratingMatch.receiver_id
+      : ratingMatch.requester_id;
+    try {
+      await rateMatch(ratingMatch.id, ratedId, selectedRating);
+      Alert.alert(
+        'Rating submitted',
+        `You gave ${selectedRating} stars. This updates their reliability score.`
+      );
+      setRatingMatch(null);
+      setSelectedRating(0);
+      // Remove from list — match is now completed
+      setMatches(prev => prev.filter(m => m.id !== ratingMatch.id));
+    } catch (e) {
+      Alert.alert('Error', 'Could not submit rating. Try again.');
+    }
+  };
+
+  const availableDays = getAvailableDays(otherAvailability);
+  const availableTimes = selectedDay
+    ? getAvailableTimes(otherAvailability, selectedDay)
+    : [];
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.safe, { paddingTop: insets.top }]}>
+
+      {/* Schedule Modal */}
+      <Modal
+        visible={!!scheduling}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setScheduling(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Schedule Match</Text>
+            <Text style={styles.modalSubtitle}>
+              Pick a day and time that works for {scheduling?.other_name}
+            </Text>
+
+            {loadingAvail ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 20 }} />
+            ) : (
+              <>
+                {availableDays.length === 0 ? (
+                  <Text style={styles.noAvailText}>
+                    {scheduling?.other_name} hasn't set their availability yet.
+                  </Text>
+                ) : (
+                  <>
+                    <Text style={styles.pickLabel}>
+                      Available days for {scheduling?.other_name}
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={{ marginBottom: 16 }}
+                    >
+                      <View style={styles.chipRow}>
+                        {availableDays.map(day => (
+                          <TouchableOpacity
+                            key={day}
+                            style={[styles.chip, selectedDay === day && styles.chipActive]}
+                            onPress={() => {
+                              setSelectedDay(day);
+                              setSelectedTime(null);
+                            }}
+                          >
+                            <Text style={[styles.chipText, selectedDay === day && styles.chipTextActive]}>
+                              {day}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+
+                    {selectedDay && (
+                      <>
+                        <Text style={styles.pickLabel}>Available times</Text>
+                        {availableTimes.length === 0 ? (
+                          <Text style={styles.noAvailText}>No specific times available for this day.</Text>
+                        ) : (
+                          <View style={styles.chipRow}>
+                            {availableTimes.map(time => (
+                              <TouchableOpacity
+                                key={time}
+                                style={[styles.chip, selectedTime === time && styles.chipActive]}
+                                onPress={() => setSelectedTime(time)}
+                              >
+                                <Text style={[styles.chipText, selectedTime === time && styles.chipTextActive]}>
+                                  {time}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => {
+                  setScheduling(null);
+                  setSelectedDay(null);
+                  setSelectedTime(null);
+                }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalSubmit,
+                  (!selectedDay || !selectedTime) && styles.modalSubmitDisabled,
+                ]}
+                onPress={confirmSchedule}
+                disabled={!selectedDay || !selectedTime}
+              >
+                <Text style={styles.modalSubmitText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rating Modal */}
+      <Modal
+        visible={!!ratingMatch}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRatingMatch(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Rate your match</Text>
+            <Text style={styles.modalSubtitle}>
+              How was your game with {ratingMatch?.other_name}?
+              This updates their reliability score.
+            </Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map(star => (
+                <TouchableOpacity key={star} onPress={() => setSelectedRating(star)}>
+                  <Text style={[styles.star, selectedRating >= star && styles.starActive]}>
+                    ★
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.ratingLabel}>
+              {selectedRating === 0 && 'Tap a star to rate'}
+              {selectedRating === 1 && '1 — Poor'}
+              {selectedRating === 2 && '2 — Below average'}
+              {selectedRating === 3 && '3 — Average'}
+              {selectedRating === 4 && '4 — Good'}
+              {selectedRating === 5 && '5 — Excellent'}
+            </Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => { setRatingMatch(null); setSelectedRating(0); }}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmit, !selectedRating && styles.modalSubmitDisabled]}
+                onPress={submitRating}
+                disabled={!selectedRating}
+              >
+                <Text style={styles.modalSubmitText}>Submit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>My Matches</Text>
+        <Text style={styles.subtitle}>{matches.length} accepted</Text>
+      </View>
+
+      <FlatList
+        data={matches}
+        keyExtractor={item => String(item.id)}
+        contentContainerStyle={styles.list}
+        onRefresh={load}
+        refreshing={loading}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <View style={styles.cardTop}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {(item.other_name || 'P')[0].toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.name}>{item.other_name}</Text>
+                <Text style={styles.meta}>
+                  Tennis  •  {item.skill_level}
+                </Text>
+                {item.scheduled_time ? (
+                  <Text style={styles.scheduled}>Scheduled: {item.scheduled_time}</Text>
+                ) : (
+                  <Text style={styles.notScheduled}>Not yet scheduled</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.cardActions}>
+              <TouchableOpacity
+                style={styles.scheduleBtn}
+                onPress={() => openSchedule(item)}
+              >
+                <Text style={styles.scheduleBtnText}>
+                  {item.scheduled_time ? 'Reschedule' : 'Schedule'}
+                </Text>
+              </TouchableOpacity>
+
+              {item.scheduled_time && (
+                <TouchableOpacity
+                  style={styles.rateBtn}
+                  onPress={() => { setRatingMatch(item); setSelectedRating(0); }}
+                >
+                  <Text style={styles.rateBtnText}>Rate match</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>🎾</Text>
+            <Text style={styles.emptyText}>No accepted matches yet</Text>
+            <Text style={styles.emptySubtext}>
+              Accept a match request to schedule a game
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe:         { flex: 1, backgroundColor: COLORS.secondary },
+  center:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.secondary },
+  header:       { paddingHorizontal: 20, paddingVertical: 16, backgroundColor: COLORS.darkCard, borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30' },
+  title:        { fontSize: 24, fontWeight: '900', color: COLORS.textLight },
+  subtitle:     { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  list:         { padding: 16, paddingBottom: 40 },
+  card:         { backgroundColor: COLORS.darkCard, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: COLORS.primary + '25' },
+  cardTop:      { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  avatar:       { width: 46, height: 46, borderRadius: 23, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarText:   { fontSize: 18, fontWeight: '900', color: COLORS.dark },
+  info:         { flex: 1 },
+  name:         { fontSize: 15, fontWeight: '800', color: COLORS.textLight, marginBottom: 2 },
+  meta:         { fontSize: 12, color: COLORS.muted },
+  scheduled:    { fontSize: 12, color: COLORS.primary, fontWeight: '700', marginTop: 3 },
+  notScheduled: { fontSize: 12, color: COLORS.warning, marginTop: 3 },
+  cardActions:  { flexDirection: 'row', gap: 10 },
+  scheduleBtn:  { flex: 1, backgroundColor: COLORS.primary, borderRadius: 10, padding: 10, alignItems: 'center' },
+  scheduleBtnText: { color: COLORS.dark, fontWeight: '800', fontSize: 13 },
+  rateBtn:      { flex: 1, borderWidth: 1.5, borderColor: COLORS.warning, borderRadius: 10, padding: 10, alignItems: 'center' },
+  rateBtnText:  { color: COLORS.warning, fontWeight: '700', fontSize: 13 },
+  empty:        { alignItems: 'center', marginTop: 80, paddingHorizontal: 32 },
+  emptyIcon:    { fontSize: 48, marginBottom: 16 },
+  emptyText:    { fontSize: 20, fontWeight: '800', color: COLORS.textLight, marginBottom: 8 },
+  emptySubtext: { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 20 },
+
+  // Modal
+  modalOverlay:      { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  modalCard:         { backgroundColor: COLORS.darkCard, borderRadius: 20, padding: 24, width: '100%', borderWidth: 1, borderColor: COLORS.primary + '40', maxHeight: '80%' },
+  modalTitle:        { fontSize: 20, fontWeight: '900', color: COLORS.textLight, marginBottom: 6 },
+  modalSubtitle:     { fontSize: 13, color: COLORS.muted, marginBottom: 16, lineHeight: 18 },
+  pickLabel:         { fontSize: 11, color: COLORS.primary, fontWeight: '700', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  noAvailText:       { fontSize: 13, color: COLORS.muted, marginBottom: 16, fontStyle: 'italic' },
+  chipRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip:              { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1.5, borderColor: COLORS.primary + '40', backgroundColor: COLORS.secondary },
+  chipActive:        { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipText:          { fontSize: 12, color: COLORS.muted, fontWeight: '600' },
+  chipTextActive:    { color: COLORS.dark, fontWeight: '800' },
+  starsRow:          { flexDirection: 'row', gap: 8, marginBottom: 12, justifyContent: 'center' },
+  star:              { fontSize: 40, color: COLORS.muted },
+  starActive:        { color: COLORS.warning },
+  ratingLabel:       { fontSize: 14, color: COLORS.muted, marginBottom: 24, fontWeight: '600', textAlign: 'center' },
+  modalBtns:         { flexDirection: 'row', gap: 12, marginTop: 8 },
+  modalCancel:       { flex: 1, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: COLORS.muted, alignItems: 'center' },
+  modalCancelText:   { color: COLORS.muted, fontWeight: '700' },
+  modalSubmit:       { flex: 1, padding: 14, borderRadius: 12, backgroundColor: COLORS.primary, alignItems: 'center' },
+  modalSubmitDisabled: { opacity: 0.4 },
+  modalSubmitText:   { color: COLORS.dark, fontWeight: '900' },
+});
+
+
+===== FILE: src\screens\PendingMatchesScreen.js =====
+
+import React, { useState, useEffect } from 'react';
+import {
+  View, Text, FlatList, TouchableOpacity,
+  StyleSheet, ActivityIndicator, Alert, SafeAreaView,
+} from 'react-native';
+import { auth, db } from '../config/firebase';
+import {
+  collection, addDoc, query, where, getDocs,
+} from 'firebase/firestore';
+import { getPendingMatches, respondToMatch, getProfile } from '../services/api';
+import { COLORS } from '../constants';
+
+export default function PendingMatchesScreen({ navigation }) {
+  const [matches, setMatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
+    try {
+      const res = await getPendingMatches(uid);
+      setMatches(res.data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const respond = async (match, response) => {
+    try {
+      await respondToMatch(match.id, response);
+      setMatches(prev => prev.filter(m => m.id !== match.id));
+
+      if (response === 'accepted') {
+        const myUid = auth.currentUser?.uid;
+
+        // Get the requester's Firebase UID
+        const requesterProfileRes = await getProfile(String(match.requester_id));
+        const requesterFirebaseUid = requesterProfileRes.data?.firebase_uid;
+
+        if (!requesterFirebaseUid) {
+          Alert.alert('Error', 'Could not set up chat. Please try again.');
+          return;
+        }
+
+        // Get both names
+        const myProfileRes = await getProfile(myUid);
+        const myName = myProfileRes.data?.name || 'Player';
+
+        // Check if a shared chat already exists between both UIDs
+        const existingQ = query(
+          collection(db, 'chats'),
+          where('participants', 'array-contains', myUid)
+        );
+        const existingSnap = await getDocs(existingQ);
+        const existingDoc = existingSnap.docs.find(doc =>
+          doc.data().participants?.includes(requesterFirebaseUid)
+        );
+
+        let sharedChatId;
+
+        if (existingDoc) {
+          
+          
+          sharedChatId = existingDoc.id;
+        } else {
+          // Create ONE shared chat document
+          // Store both names so each user can look up what to display
+          const chatRef = await addDoc(collection(db, 'chats'), {
+            participants:      [myUid, requesterFirebaseUid],
+            // Map of uid -> display name for the OTHER person
+            names: {
+              [myUid]:              match.requester_name, // I see requester's name
+              [requesterFirebaseUid]: myName,             // requester sees my name
+            },
+            // Keep other_name for backward compat — will be overridden per-user in ChatListScreen
+            other_name:        match.requester_name,
+            last_message:      'Match accepted! 🎾',
+            last_message_time: new Date(),
+          });
+          sharedChatId = chatRef.id;
+        }
+
+        Alert.alert(
+          'Match accepted! 🎾',
+          `You are now matched with ${match.requester_name}. Start chatting!`,
+          [
+            {
+              text: 'Message them',
+              onPress: () => navigation.navigate('ChatRoom', {
+                chatId:    sharedChatId,
+                otherName: match.requester_name,
+              }),
+            },
+            { text: 'Later', style: 'cancel' },
+          ]
+        );
+      } else {
+        Alert.alert('Declined', 'Match request declined.');
+      }
+    } catch (e) {
+      console.error('Respond error:', e);
+      Alert.alert('Error', 'Could not respond. Try again.');
+    }
+  };
+
+  const getScoreColor = (score) => {
+    if (score >= 80) return COLORS.primary;
+    if (score >= 55) return COLORS.warning;
+    return COLORS.danger;
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Text style={styles.backArrow}>←</Text>
+        </TouchableOpacity>
+        <View>
+          <Text style={styles.title}>Match Requests</Text>
+          <Text style={styles.subtitle}>{matches.length} pending</Text>
+        </View>
+        <View style={{ width: 40 }} />
+      </View>
+
+      <FlatList
+        data={matches}
+        keyExtractor={item => String(item.id)}
+        contentContainerStyle={styles.list}
+        renderItem={({ item }) => {
+          const score = Number(item.compatibility_score ?? 0);
+          const scoreColor = getScoreColor(score);
+          return (
+            <View style={styles.card}>
+              <View style={[styles.scoreBadge, { borderColor: scoreColor }]}>
+                <Text style={[styles.scoreNum, { color: scoreColor }]}>{score}</Text>
+                <Text style={[styles.scorePct, { color: scoreColor }]}>%</Text>
+              </View>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>
+                  {(item.requester_name || 'P')[0].toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.name}>{item.requester_name}</Text>
+                <Text style={styles.meta}>🎾 {item.sport}</Text>
+                <Text style={styles.meta}> {item.skill_level}</Text>
+              </View>
+              <View style={styles.btns}>
+                <TouchableOpacity
+                  style={styles.acceptBtn}
+                  onPress={() => respond(item, 'accepted')}
+                >
+                  <Text style={styles.acceptText}>✓</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.declineBtn}
+                  onPress={() => respond(item, 'declined')}
+                >
+                  <Text style={styles.declineText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}></Text>
+            <Text style={styles.emptyText}>No pending requests</Text>
+            <Text style={styles.emptySubtext}>
+              When someone sends you a match request it will appear here
+            </Text>
+          </View>
+        }
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe:   { flex: 1, backgroundColor: COLORS.secondary },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.secondary },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: COLORS.darkCard,
+    borderBottomWidth: 1, borderBottomColor: COLORS.primary + '30',
+  },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.primary + '40',
+  },
+  backArrow: { fontSize: 20, color: COLORS.primary, fontWeight: '700' },
+  title:    { fontSize: 20, fontWeight: '900', color: COLORS.textLight },
+  subtitle: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  list: { padding: 16, paddingBottom: 40 },
+  card: {
+    backgroundColor: COLORS.darkCard, borderRadius: 14, padding: 14,
+    marginBottom: 12, flexDirection: 'row', alignItems: 'center',
+    gap: 10, borderWidth: 1, borderColor: COLORS.primary + '25',
+  },
+  scoreBadge: {
+    width: 46, height: 46, borderRadius: 23, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  scoreNum: { fontSize: 14, fontWeight: '900', lineHeight: 16 },
+  scorePct: { fontSize: 9, fontWeight: '700' },
+  avatar: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText:  { fontSize: 18, fontWeight: '900', color: COLORS.dark },
+  info:        { flex: 1 },
+  name:        { fontSize: 15, fontWeight: '800', color: COLORS.textLight, marginBottom: 2 },
+  meta:        { fontSize: 12, color: COLORS.muted, marginTop: 1 },
+  btns:        { flexDirection: 'column', gap: 6 },
+  acceptBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: COLORS.success,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  acceptText:  { color: COLORS.dark, fontSize: 18, fontWeight: '900' },
+  declineBtn: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: '#3D1515',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.danger,
+  },
+  declineText:  { color: COLORS.danger, fontSize: 18, fontWeight: '900' },
+  empty:        { alignItems: 'center', marginTop: 80, paddingHorizontal: 32 },
+  emptyIcon:    { fontSize: 48, marginBottom: 16 },
+  emptyText:    { fontSize: 20, fontWeight: '800', color: COLORS.textLight, marginBottom: 8 },
+  emptySubtext: { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 20 },
+});
+
+
+===== FILE: src\screens\SplashScreen.js =====
+
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import { COLORS } from '../constants';
+
+export default function SplashScreen() {
+  const scale = useRef(new Animated.Value(0.5)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scale, {
+        toValue: 1, tension: 50, friction: 7, useNativeDriver: true,
+      }),
+      Animated.timing(opacity, {
+        toValue: 1, duration: 600, useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  return (
+    <View style={styles.container}>
+      <Animated.View style={[styles.logoContainer, { transform: [{ scale }], opacity }]}>
+        <View style={styles.logoOuter}>
+          <View style={styles.logoInner}>
+            <Text style={styles.logoEmoji}>🎾</Text>
+          </View>
+        </View>
+        <Text style={styles.title}>Match<Text style={styles.titleAccent}>UP</Text></Text>
+        <Text style={styles.subtitle}>Find · Play · Win</Text>
+        <View style={styles.dotsRow}>
+          <View style={[styles.dot, styles.dotActive]} />
+          <View style={styles.dot} />
+          <View style={styles.dot} />
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.secondary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoContainer: { alignItems: 'center' },
+  logoOuter: {
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: COLORS.primary + '30',
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 24,
+    borderWidth: 2, borderColor: COLORS.primary + '50',
+  },
+  logoInner: {
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8, shadowRadius: 20, elevation: 10,
+  },
+  logoEmoji: { fontSize: 44 },
+  title: {
+    fontSize: 42, fontWeight: '900',
+    color: COLORS.textLight, letterSpacing: 2,
+  },
+  titleAccent: { color: COLORS.primary },
+  subtitle: {
+    fontSize: 16, color: COLORS.primary,
+    letterSpacing: 6, marginTop: 8, fontWeight: '600',
+  },
+  dotsRow: { flexDirection: 'row', gap: 8, marginTop: 48 },
+  dot: {
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: COLORS.primary + '40',
+  },
+  dotActive: { backgroundColor: COLORS.primary, width: 24 },
+});
+
+
+===== FILE: src\services\api.js =====
+
+import axios from 'axios';
+import { API_URL } from '../constants';
+import { auth } from '../config/firebase';
+
+const api = axios.create({
+  baseURL: API_URL,
+  timeout: 10000,
+  headers: {
+    'ngrok-skip-browser-warning': 'true',
+  },
+});
+
+// Automatically attach a fresh Firebase ID token to every request
+api.interceptors.request.use(async (config) => {
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      const token = await user.getIdToken(false);
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (e) {
+    console.warn('Could not attach token:', e.message);
+  }
+  return config;
+});
+
+// Log API errors clearly so you can debug
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const url    = error.config?.url ?? 'unknown';
+    const status = error.response?.status ?? 'no response';
+    const msg    = error.response?.data?.error ?? error.message;
+    console.error(`API Error [${status}] ${url}: ${msg}`);
+    return Promise.reject(error);
+  }
+);
+
+export const registerUser      = (data)                         => api.post('/auth/register', data);
+export const getProfile        = (id)                           => api.get(`/users/${id}`);
+export const updateProfile     = (id, data)                     => api.put(`/users/${id}`, data);
+export const getSuggestions    = (userId)                       => api.get(`/matches/suggestions/${userId}`);
+export const sendMatchRequest  = (data)                         => api.post('/matches/request', data);
+export const getPendingMatches = (userId)                       => api.get(`/matches/pending/${userId}`);
+export const respondToMatch    = (matchId, response)            => api.put(`/matches/${matchId}/respond`, { response });
+export const scheduleMatch     = (matchId, data)                => api.put(`/matches/${matchId}/schedule`, data);
+export const rateMatch         = (matchId, ratedUserId, rating) => api.post(`/matches/${matchId}/rate`, { rated_user_id: ratedUserId, rating });
+
+
+===== FILE: App.js =====
+
+import 'react-native-gesture-handler';
+import React, { useState, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './src/config/firebase';
+import AppNavigator from './src/navigation/AppNavigator';
+import SplashScreen from './src/screens/SplashScreen';
+import axios from 'axios';
+import { API_URL } from './src/constants';
+
+const LAST_SEEN_KEY = 'matchup_last_accepted_check';
+
+export default function App() {
+  const [user, setUser]       = useState(undefined);
+  const hasChecked = useRef(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+
+      if (firebaseUser && !hasChecked.current) {
+        hasChecked.current = true;
+        checkNewlyAcceptedMatches(firebaseUser);
+      }
+
+      if (!firebaseUser) {
+        hasChecked.current = false;
+      }
+    });
+    return unsub;
+  }, []);
+
+  const checkNewlyAcceptedMatches = async (firebaseUser) => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      const api = axios.create({ baseURL: API_URL, timeout: 10000 });
+      const res = await api.get(`/matches/accepted/${firebaseUser.uid}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const accepted = res.data || [];
+      const recent = accepted.filter(m => {
+        if (!m.created_at) return false;
+        const matchDate = new Date(m.created_at);
+        const hoursSince = (Date.now() - matchDate.getTime()) / 1000 / 60 / 60;
+        return hoursSince < 2;
+      });
+
+      if (recent.length > 0) {
+        const names = recent.map(m => m.other_name).filter(Boolean);
+        const uniqueNames = [...new Set(names)];
+
+        if (uniqueNames.length === 1) {
+          Alert.alert(
+            '🎾 Match accepted!',
+            `${uniqueNames[0]} accepted your match request! Head to the Schedule tab to plan your game.`,
+            [{ text: 'Let\'s go! 🎾', style: 'default' }]
+          );
+        } else if (uniqueNames.length > 1) {
+          Alert.alert(
+            '🎾 New matches!',
+            `${uniqueNames.slice(0, -1).join(', ')} and ${uniqueNames.slice(-1)} accepted your match requests! Check the Schedule tab.`,
+            [{ text: 'Let\'s go! 🎾', style: 'default' }]
+          );
+        }
+      }
+    } catch (e) {
+      console.log('Notification check failed:', e.message);
+    }
+  };
+
+  if (user === undefined) return <SplashScreen />;
+
+  return <AppNavigator user={user} />;
+}
+
+
+===== FILE: app.json =====
+
+{
+  "expo": {
+    "name": "matchup",
+    "slug": "matchup",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
+
+
+===== FILE: index.js =====
+
+import { registerRootComponent } from 'expo';
+
+import App from './App';
+
+// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
+// It also ensures that whether you load the app in Expo Go or in a native build,
+// the environment is set up appropriately
+registerRootComponent(App);
+
+
+===== FILE: package.json =====
+
+{
+  "name": "matchup",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/ngrok": "^4.1.3",
+    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-navigation/bottom-tabs": "^7.15.9",
+    "@react-navigation/native": "^7.2.2",
+    "@react-navigation/stack": "^7.8.9",
+    "axios": "^1.14.0",
+    "date-fns": "^4.1.0",
+    "expo": "~54.0.33",
+    "expo-image-picker": "~17.0.10",
+    "expo-location": "~19.0.8",
+    "expo-notifications": "~0.32.16",
+    "expo-status-bar": "~3.0.9",
+    "firebase": "^12.11.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-gesture-handler": "~2.28.0",
+    "react-native-maps": "1.20.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0"
+  },
+  "private": true
+}
+
+
+########## BACKEND (Node.js / Express / PostgreSQL) ##########
+
+
+===== FILE: matchup-backend\src\db\pool.js =====
+
+const { Pool } = require('pg');
+require('dotenv').config();
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  // increase if you see "too many clients" errors
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected PostgreSQL error:', err.message);
+});
+
+module.exports = pool;
+
+
+===== FILE: matchup-backend\src\db\schema.sql =====
+
+-- MatchUP PostgreSQL Schema
+-- Run this once to create your database tables, or re-run safely to apply updates
+-- psql -U postgres -d matchup -f schema.sql
+
+CREATE TABLE IF NOT EXISTS users (
+  id                SERIAL PRIMARY KEY,
+  firebase_uid      TEXT UNIQUE NOT NULL,
+  name              TEXT NOT NULL,
+  email             TEXT UNIQUE NOT NULL,
+  sport             TEXT NOT NULL DEFAULT 'Tennis',
+  skill_level       TEXT NOT NULL DEFAULT 'Intermediate',
+  latitude          DOUBLE PRECISION NOT NULL DEFAULT 51.5074,
+  longitude         DOUBLE PRECISION NOT NULL DEFAULT -0.1278,
+  radius_km         INTEGER NOT NULL DEFAULT 10,
+  availability      TEXT[] NOT NULL DEFAULT '{}',
+  reliability_score NUMERIC(3, 2) NOT NULL DEFAULT 5.00,
+  total_matches     INTEGER NOT NULL DEFAULT 0,
+  age               INTEGER,
+  gender            TEXT,
+  user_type         TEXT NOT NULL DEFAULT 'player'
+                      CHECK (user_type IN ('player', 'coach')),
+  coach_info        TEXT,
+  created_at        TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Safe column additions for existing databases
+ALTER TABLE users ADD COLUMN IF NOT EXISTS age        INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender     TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS user_type  TEXT DEFAULT 'player';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS coach_info TEXT;
+
+CREATE TABLE IF NOT EXISTS matches (
+  id                  SERIAL PRIMARY KEY,
+  requester_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  receiver_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  sport               TEXT NOT NULL DEFAULT 'Tennis',
+  status              TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'accepted', 'declined', 'completed')),
+  compatibility_score INTEGER NOT NULL DEFAULT 0,
+  scheduled_time      TIMESTAMP,
+  court_name          TEXT,
+  created_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Safe constraint update for existing databases
+-- (allows 'completed' status used by the rate-match endpoint)
+ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_status_check;
+ALTER TABLE matches ADD CONSTRAINT matches_status_check
+  CHECK (status IN ('pending', 'accepted', 'declined', 'completed'));
+
+-- Performance indexes
+CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
+CREATE INDEX IF NOT EXISTS idx_users_sport        ON users(sport);
+CREATE INDEX IF NOT EXISTS idx_users_user_type    ON users(user_type);
+CREATE INDEX IF NOT EXISTS idx_matches_requester  ON matches(requester_id);
+CREATE INDEX IF NOT EXISTS idx_matches_receiver   ON matches(receiver_id);
+CREATE INDEX IF NOT EXISTS idx_matches_status     ON matches(status);
+
+
+===== FILE: matchup-backend\src\middleware\auth.js =====
+
+const admin = require('firebase-admin');
+require('dotenv').config();
+
+if (!admin.apps.length) {
+  try {
+    // OPTION A (simple — for development, no service account file needed):
+    admin.initializeApp({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+    });
+
+    // OPTION B (recommended for production — download serviceAccountKey.json from
+    // Firebase Console → Project Settings → Service Accounts → Generate new private key
+    // then uncomment the 3 lines below and comment out the initializeApp above):
+    //
+    // const serviceAccount = require('../../serviceAccountKey.json');
+    // admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+
+    console.log('Firebase Admin initialised');
+  } catch (e) {
+    console.error('Firebase Admin init failed:', e.message);
+  }
+}
+
+module.exports = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  const token = authHeader.split('Bearer ')[1];
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.user = decoded;
+    next();
+  } catch (e) {
+    console.error('Token verification failed:', e.message);
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};
+
+
+===== FILE: matchup-backend\src\routes\auth.js =====
+
+const router = require('express').Router();
+const pool   = require('../db/pool');
+
+router.post('/register', async (req, res) => {
+  const {
+    firebase_uid, name, email, sport,
+    skill_level, latitude, longitude,
+    radius_km, availability, age, gender,
+    user_type, coach_info,
+  } = req.body;
+
+  if (!firebase_uid || !name || !email) {
+    return res.status(400).json({ error: 'firebase_uid, name, and email are required' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO users
+         (firebase_uid, name, email, sport, skill_level,
+          latitude, longitude, radius_km, availability,
+          age, gender, user_type, coach_info)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (firebase_uid)
+       DO UPDATE SET
+         name        = EXCLUDED.name,
+         email       = EXCLUDED.email,
+         sport       = EXCLUDED.sport,
+         skill_level = EXCLUDED.skill_level,
+         latitude    = EXCLUDED.latitude,
+         longitude   = EXCLUDED.longitude,
+         radius_km   = EXCLUDED.radius_km,
+         availability= EXCLUDED.availability,
+         age         = EXCLUDED.age,
+         gender      = EXCLUDED.gender,
+         user_type   = EXCLUDED.user_type,
+         coach_info  = EXCLUDED.coach_info
+       RETURNING *`,
+      [
+        firebase_uid,
+        name,
+        email,
+        sport        || 'Tennis',
+        skill_level  || 'Intermediate',
+        latitude     ?? 51.5074,
+        longitude    ?? -0.1278,
+        radius_km    || 10,
+        availability || [],
+        age          || null,
+        gender       || null,
+        user_type    || 'player',
+        coach_info   || null,
+      ]
+    );
+
+    console.log(`User registered: ${name} (${email})`);
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Register error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+module.exports = router;
+
+
+===== FILE: matchup-backend\src\routes\matches.js =====
+
+const router = require('express').Router();
+const pool   = require('../db/pool');
+const auth   = require('../middleware/auth');
+
+const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Professional'];
+
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculateScore(user, candidate) {
+  let score = 0;
+
+  // 1. Skill (max 40)
+  const uSkill = SKILL_LEVELS.indexOf(user.skill_level);
+  const cSkill = SKILL_LEVELS.indexOf(candidate.skill_level);
+  const diff = Math.abs(uSkill - cSkill);
+  if      (diff === 0) score += 40;
+  else if (diff === 1) score += 25;
+  else if (diff === 2) score += 10;
+
+  // 2. Availability overlap (max 30)
+  const uSlots = Array.isArray(user.availability)      ? user.availability      : [];
+  const cSlots = Array.isArray(candidate.availability) ? candidate.availability : [];
+  const overlap = uSlots.filter(s => cSlots.includes(s)).length;
+  score += Math.round((overlap / Math.max(uSlots.length, 1)) * 30);
+
+  // 3. Distance (max 20)
+  const distKm = haversineKm(user.latitude, user.longitude, candidate.latitude, candidate.longitude);
+  const radius = user.radius_km || 10;
+  if (distKm <= radius) {
+    score += Math.round((1 - distKm / radius) * 20);
+  }
+
+  // 4. Reliability (max 10)
+  score += Math.round((Number(candidate.reliability_score) / 5) * 10);
+
+  return Math.min(score, 100);
+}
+
+// GET /api/matches/suggestions/:uid
+router.get('/suggestions/:uid', auth, async (req, res) => {
+  try {
+    const userRes = await pool.query(
+      'SELECT * FROM users WHERE firebase_uid = $1 OR id::text = $1 LIMIT 1',
+      [req.params.uid]
+    );
+    if (!userRes.rows[0]) return res.json([]);
+    const user = userRes.rows[0];
+
+    const candidatesRes = await pool.query(
+      `SELECT * FROM users
+       WHERE sport = $1 AND id != $2
+         AND id NOT IN (
+           SELECT CASE WHEN requester_id = $2 THEN receiver_id ELSE requester_id END
+           FROM matches
+           WHERE (requester_id = $2 OR receiver_id = $2)
+             AND status IN ('pending','accepted')
+         )`,
+      [user.sport, user.id]
+    );
+
+    const scored = candidatesRes.rows
+      .map(c => {
+        const distKm  = haversineKm(user.latitude, user.longitude, c.latitude, c.longitude);
+        const distMiles = (distKm * 0.621371).toFixed(1);
+        return {
+          ...c,
+          compatibility_score: calculateScore(user, c),
+          distance_miles: parseFloat(distMiles),
+        };
+      })
+      .sort((a, b) => b.compatibility_score - a.compatibility_score)
+      .slice(0, 20);
+
+    res.json(scored);
+  } catch (e) {
+    console.error('Suggestions error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/matches/request
+router.post('/request', auth, async (req, res) => {
+  const { requester_id, receiver_id, sport } = req.body;
+  if (!requester_id || !receiver_id)
+    return res.status(400).json({ error: 'requester_id and receiver_id are required' });
+
+  try {
+    const [rqRes, rcRes] = await Promise.all([
+      pool.query('SELECT * FROM users WHERE firebase_uid = $1 OR id::text = $1 LIMIT 1', [String(requester_id)]),
+      pool.query('SELECT * FROM users WHERE id::text = $1 LIMIT 1', [String(receiver_id)]),
+    ]);
+    if (!rqRes.rows[0]) return res.status(404).json({ error: 'Requester not found' });
+    if (!rcRes.rows[0]) return res.status(404).json({ error: 'Receiver not found' });
+
+    const existing = await pool.query(
+      `SELECT id FROM matches WHERE requester_id=$1 AND receiver_id=$2 AND status='pending'`,
+      [rqRes.rows[0].id, rcRes.rows[0].id]
+    );
+    if (existing.rows[0]) return res.status(409).json({ error: 'Match request already pending' });
+
+    const score = calculateScore(rqRes.rows[0], rcRes.rows[0]);
+    const result = await pool.query(
+      `INSERT INTO matches (requester_id, receiver_id, sport, compatibility_score)
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [rqRes.rows[0].id, rcRes.rows[0].id, sport || 'Tennis', score]
+    );
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Match request error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/matches/pending/:uid
+router.get('/pending/:uid', auth, async (req, res) => {
+  try {
+    const userRes = await pool.query(
+      'SELECT id FROM users WHERE firebase_uid = $1 OR id::text = $1 LIMIT 1',
+      [req.params.uid]
+    );
+    if (!userRes.rows[0]) return res.json([]);
+
+    const result = await pool.query(
+      `SELECT m.*, u.name AS requester_name, u.skill_level, u.reliability_score, u.age, u.gender
+       FROM matches m JOIN users u ON u.id = m.requester_id
+       WHERE m.receiver_id = $1 AND m.status = 'pending'
+       ORDER BY m.created_at DESC`,
+      [userRes.rows[0].id]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    console.error('Pending matches error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/matches/:id/respond
+router.put('/:id/respond', auth, async (req, res) => {
+  const { response } = req.body;
+  if (!['accepted','declined'].includes(response))
+    return res.status(400).json({ error: 'response must be "accepted" or "declined"' });
+
+  try {
+    const result = await pool.query(
+      `UPDATE matches SET status=$1 WHERE id::text=$2 RETURNING *`,
+      [response, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Match not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Respond error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/matches/:id/schedule
+router.put('/:id/schedule', auth, async (req, res) => {
+  const { scheduled_time, court_name } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE matches SET scheduled_time=$1, court_name=$2 WHERE id::text=$3 RETURNING *`,
+      [scheduled_time || null, court_name || null, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Match not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/matches/:id/rate
+router.post('/:id/rate', auth, async (req, res) => {
+  const { rated_user_id, rating } = req.body;
+  if (!rated_user_id || rating === undefined)
+    return res.status(400).json({ error: 'rated_user_id and rating are required' });
+
+  const numRating = Number(rating);
+  if (isNaN(numRating) || numRating < 1 || numRating > 5)
+    return res.status(400).json({ error: 'Rating must be 1-5' });
+
+  try {
+    // Update reliability score
+    const result = await pool.query(
+      `UPDATE users SET
+         reliability_score = ROUND(((reliability_score * total_matches + $1) / (total_matches + 1))::numeric, 2),
+         total_matches = total_matches + 1
+       WHERE id::text = $2
+       RETURNING id, name, reliability_score, total_matches`,
+      [numRating, String(rated_user_id)]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+
+    // Mark match as completed so it can't be rated again
+    await pool.query(
+      `UPDATE matches SET status = 'completed' WHERE id::text = $1`,
+      [req.params.id]
+    );
+
+    console.log(`Rated user ${result.rows[0].name}: new score ${result.rows[0].reliability_score}`);
+    res.json({ success: true, ...result.rows[0] });
+  } catch (e) {
+    console.error('Rate error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/matches/accepted/:uid
+router.get('/accepted/:uid', auth, async (req, res) => {
+  try {
+    const userRes = await pool.query(
+      'SELECT id FROM users WHERE firebase_uid = $1 OR id::text = $1 LIMIT 1',
+      [req.params.uid]
+    );
+    if (!userRes.rows[0]) return res.json([]);
+    const userId = userRes.rows[0].id;
+
+    const result = await pool.query(
+      `SELECT m.*,
+              CASE WHEN m.requester_id=$1 THEN r.name ELSE u.name END AS other_name,
+              CASE WHEN m.requester_id=$1 THEN r.skill_level ELSE u.skill_level END AS skill_level,
+              CASE WHEN m.requester_id=$1 THEN m.receiver_id ELSE m.requester_id END AS other_user_id
+       FROM matches m
+       JOIN users u ON u.id = m.requester_id
+       JOIN users r ON r.id = m.receiver_id
+       WHERE (m.requester_id=$1 OR m.receiver_id=$1) AND m.status='accepted'
+       ORDER BY m.created_at DESC`,
+      [userId]
+    );
+    res.json(result.rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+module.exports = router;
+
+
+===== FILE: matchup-backend\src\routes\users.js =====
+
+const router = require('express').Router();
+const pool   = require('../db/pool');
+const auth   = require('../middleware/auth');
+
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM users WHERE firebase_uid = $1 OR id::text = $1 LIMIT 1`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Get user error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.put('/:id', auth, async (req, res) => {
+  const { name, sport, skill_level, availability, radius_km, age, gender, user_type, coach_info } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE users SET
+         name        = COALESCE($1, name),
+         sport       = COALESCE($2, sport),
+         skill_level = COALESCE($3, skill_level),
+         availability= COALESCE($4, availability),
+         radius_km   = COALESCE($5, radius_km),
+         age         = COALESCE($6, age),
+         gender      = COALESCE($7, gender),
+         user_type   = COALESCE($8, user_type),
+         coach_info  = COALESCE($9, coach_info)
+       WHERE firebase_uid = $10 OR id::text = $10
+       RETURNING *`,
+      [name, sport, skill_level, availability, radius_km, age, gender, user_type, coach_info, req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'User not found' });
+    res.json(result.rows[0]);
+  } catch (e) {
+    console.error('Update user error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+module.exports = router;
+
+
+===== FILE: matchup-backend\src\index.js =====
+
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+
+const app = express();
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+app.use(express.json());
+
+// stops ngrok intercepting API calls
+app.use((req, res, next) => {
+  res.setHeader('ngrok-skip-browser-warning', 'true');
+  next();
+});
+
+app.use('/api/auth',    require('./routes/auth'));
+app.use('/api/users',   require('./routes/users'));
+app.use('/api/matches', require('./routes/matches'));
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'MatchUP backend running 🎾' });
+});
+
+// Health check for the offline banner
+app.get('/api/health', (req, res) => res.json({ ok: true, timestamp: Date.now() }));
+
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
+});
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`MatchUP backend running on port ${PORT}`);
+});
+
+
+===== FILE: matchup-backend\package.json =====
+
+{
+  "name": "matchup-backend",
+  "version": "1.0.0",
+  "description": "MatchUP backend API",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "firebase-admin": "^12.0.0",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
+
+
+########## FIRESTORE SECURITY RULES ##########
+
+(These are configured in Firebase Console, not in the codebase.)

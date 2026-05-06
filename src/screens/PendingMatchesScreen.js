@@ -63,8 +63,6 @@ export default function PendingMatchesScreen({ navigation }) {
         let sharedChatId;
 
         if (existingDoc) {
-          
-          
           sharedChatId = existingDoc.id;
         } else {
           // Create ONE shared chat document
@@ -73,10 +71,10 @@ export default function PendingMatchesScreen({ navigation }) {
             participants:      [myUid, requesterFirebaseUid],
             // Map of uid -> display name for the OTHER person
             names: {
-              [myUid]:              match.requester_name, // I see requester's name
-              [requesterFirebaseUid]: myName,             // requester sees my name
+              [myUid]:                match.requester_name, // I see requester's name
+              [requesterFirebaseUid]: myName,               // requester sees my name
             },
-            // Keep other_name for backward compat — will be overridden per-user in ChatListScreen
+            // Keep other_name for backward compat — overridden per-user in ChatListScreen
             other_name:        match.requester_name,
             last_message:      'Match accepted! 🎾',
             last_message_time: new Date(),
@@ -154,8 +152,8 @@ export default function PendingMatchesScreen({ navigation }) {
               </View>
               <View style={styles.info}>
                 <Text style={styles.name}>{item.requester_name}</Text>
-                <Text style={styles.meta}>🎾 {item.sport}</Text>
-                <Text style={styles.meta}> {item.skill_level}</Text>
+                <Text style={styles.meta}>{item.sport}</Text>
+                <Text style={styles.meta}>{item.skill_level}</Text>
               </View>
               <View style={styles.btns}>
                 <TouchableOpacity
@@ -176,7 +174,6 @@ export default function PendingMatchesScreen({ navigation }) {
         }}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyIcon}></Text>
             <Text style={styles.emptyText}>No pending requests</Text>
             <Text style={styles.emptySubtext}>
               When someone sends you a match request it will appear here
@@ -242,7 +239,6 @@ const styles = StyleSheet.create({
   },
   declineText:  { color: COLORS.danger, fontSize: 18, fontWeight: '900' },
   empty:        { alignItems: 'center', marginTop: 80, paddingHorizontal: 32 },
-  emptyIcon:    { fontSize: 48, marginBottom: 16 },
   emptyText:    { fontSize: 20, fontWeight: '800', color: COLORS.textLight, marginBottom: 8 },
   emptySubtext: { fontSize: 14, color: COLORS.muted, textAlign: 'center', lineHeight: 20 },
 });

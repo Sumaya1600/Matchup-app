@@ -27,16 +27,23 @@ export default function ChatRoomScreen({ route, navigation }) {
   }, [otherName]);
 
   // Listen to messages
-  useEffect(() => {
-    if (!chatId) return;
-    const q = query(
-      collection(db, 'chats', chatId, 'messages'),
-      orderBy('timestamp', 'desc')
-    );
-    return onSnapshot(q, snap => {
-      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
-  }, [chatId]);
+useEffect(() => {
+  if (!chatId || !auth.currentUser) {
+    setMessages([]);
+    return;
+  }
+  
+  const q = query(
+    collection(db, 'chats', chatId, 'messages'),
+    orderBy('timestamp', 'desc')
+  );
+  
+  const unsubscribe = onSnapshot(q, snap => {
+    setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+  
+  return () => unsubscribe();
+}, [chatId]);
 
   // Clear unread count for current user when chat is opened
   useEffect(() => {

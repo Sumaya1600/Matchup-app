@@ -3,7 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet } from 'react-native';
-import { collection, query, where, onSnapshot, Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 import LoginScreen          from '../screens/auth/LoginScreen';
 import RegisterScreen       from '../screens/auth/RegisterScreen';
@@ -36,38 +37,45 @@ function TabIcon({ name, focused, badgeCount }) {
 
 function MainTabs() {
   const [unreadCount, setUnreadCount] = useState(0);
-  const uid = auth.currentUser?.uid;
+  const [uid, setUid] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  // Wait for Firebase auth to fully initialize before grabbing uid.
+  // This prevents the listener from firing before a valid auth token exists.
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setUid(user?.uid || null);
+      setAuthReady(true);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
-    if (!uid) return;
+    if (!authReady || !uid) {
+      setUnreadCount(0);
+      return;
+    }
 
-    // Listen for new messages in the last 24h from other people
-    const since = Timestamp.fromDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
-
-    // Watch user's chats
+    // Listen to all chats. Sum unread_counts[uid] across every chat.
+    // This mirrors the unread_counts map written by ChatRoomScreen on send
+    // and then reset to 0 when the chat is opened.
     const chatQ = query(
       collection(db, 'chats'),
       where('participants', 'array-contains', uid)
     );
 
-    return onSnapshot(chatQ, async (snap) => {
+    const unsubscribe = onSnapshot(chatQ, (snap) => {
       let total = 0;
-      // For each chat, check for recent messages from others
       snap.docs.forEach(chatDoc => {
         const data = chatDoc.data();
-        // Use last_message_time as a proxy: if it's recent and last sender wasn't us, count it
-        if (data.last_message_time && data.last_sender_id && data.last_sender_id !== uid) {
-          const msgTime = data.last_message_time.toDate
-            ? data.last_message_time.toDate()
-            : new Date(data.last_message_time);
-          if (msgTime > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
-            total += 1;
-          }
-        }
+        const unread = data.unread_counts?.[uid] ?? 0;
+        total += Number(unread) || 0;
       });
       setUnreadCount(total);
     });
-  }, [uid]);
+
+    return () => unsubscribe();
+  }, [uid, authReady]);
 
   return (
     <Tab.Navigator

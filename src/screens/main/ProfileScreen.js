@@ -197,7 +197,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Skill level/}
+        {/* Skill level */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Skill level</Text>
           <View style={styles.chipRow}>
