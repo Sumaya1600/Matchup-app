@@ -1,98 +1,150 @@
-# MatchUP
+# MatchUP 🎾
 
-A mobile application that matches recreational tennis players based on skill level, availability, geographic proximity, and reliability. Built as a Final Year Project for a BSc Software Engineering degree at the University of Roehampton.
+> A mobile app that matches recreational tennis players by skill level, availability, location and reliability — built as a Final Year Project for BEng Software Engineering at the University of Roehampton.
 
-## What it does
+![React Native](https://img.shields.io/badge/React%20Native-Expo-20232A?logo=react&logoColor=61DAFB)
+![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=nodedotjs&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)
+![Firebase](https://img.shields.io/badge/Firebase-Auth%20%26%20Messaging-FFCA28?logo=firebase&logoColor=black)
 
-MatchUP solves the partner-coordination problem that recreational tennis players face when using existing tools such as Facebook groups or the LTA Find a Partner directory. Users register with their skill level, weekly availability, and location, and the application returns a ranked list of compatible partners with a 0 to 100 compatibility score on each profile. The app also supports real-time chat between matched players, court and venue discovery via the Google Places API, and a reliability score updated after each completed match.
+---
 
-## Tech stack
+## The Problem
 
-- **Frontend:** React Native with Expo
-- **Backend:** Node.js with Express
-- **Database:** PostgreSQL
-- **Authentication and messaging:** Firebase (Auth and Firestore)
-- **Maps and venue search:** Google Places API
-- **Tunnelling for development:** ngrok
+Finding a tennis partner is harder than it should be. Existing tools — Facebook groups, the LTA Find a Partner directory — are manual, slow, and give you no way to filter by skill, availability, or how reliable someone actually is. MatchUP fixes that.
 
-## How the matching works
+---
+
+## What It Does
+
+Users register with their skill level, weekly availability, and location. The app returns a **ranked list of compatible partners**, each with a 0–100 compatibility score. It also supports:
+
+- 💬 **Real-time chat** between matched players (Firebase Firestore)
+- 📍 **Court and venue discovery** via the Google Places API
+- ⭐ **Reliability scores** — updated automatically after each completed match
+
+---
+
+## Matching Algorithm
 
 Each candidate is scored using a weighted four-factor algorithm:
 
-- Skill match: up to 40 points
-- Availability overlap: up to 30 points
-- Geographic proximity (Haversine formula): up to 20 points
-- Reliability score: up to 10 points
+| Factor | Max Points | Method |
+|---|---|---|
+| Skill match | 40 | Level comparison |
+| Availability overlap | 30 | Weekly schedule matching |
+| Geographic proximity | 20 | Haversine formula |
+| Reliability score | 10 | Post-match rating history |
 
-The total is bounded at 100 and shown to the user on each player card.
+Scores are bounded at 100 and displayed on each player card.
 
-## Project structure
+---
 
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React Native with Expo |
+| Backend | Node.js with Express |
+| Database | PostgreSQL |
+| Auth & Messaging | Firebase (Auth + Firestore) |
+| Maps & Venues | Google Places API |
+| Development tunnelling | ngrok |
+
+---
+
+## Project Structure
+
+```
 matchup/
-├── App.js                      # React Native entry point
+├── App.js                        # React Native entry point
 ├── src/
-│   ├── components/             # Reusable UI components
-│   ├── config/                 # Firebase configuration
-│   ├── constants/              # Shared constants and API URL
-│   ├── navigation/             # Tab and stack navigators
-│   ├── screens/                # All application screens
-│   └── services/               # API client
+│   ├── components/               # Reusable UI components
+│   ├── config/                   # Firebase configuration
+│   ├── constants/                # Shared constants and API URL
+│   ├── navigation/               # Tab and stack navigators
+│   ├── screens/                  # All application screens
+│   └── services/                 # API client
 └── matchup-backend/
-├── src/
-│   ├── index.js            # Express server entry point
-│   ├── db/                 # PostgreSQL pool and schema
-│   ├── middleware/         # Authentication middleware
-│   └── routes/             # API route handlers
-└── package.json
+    ├── src/
+    │   ├── index.js              # Express server entry point
+    │   ├── db/                   # PostgreSQL pool and schema
+    │   ├── middleware/           # Authentication middleware
+    │   └── routes/               # API route handlers
+    └── package.json
+```
 
+---
 
-## Running the application locally
+## Running Locally
 
-The application requires three terminals running in parallel.
+The app requires **three terminals running in parallel**.
 
-**Prerequisites:**
-- Node.js v18 or higher
-- PostgreSQL v14 or higher running locally
-- An ngrok account for tunnelling
-- The Expo Go app installed on a physical iOS or Android device
+**Prerequisites**
+- Node.js v18+
+- PostgreSQL v14+ running locally
+- An ngrok account
+- Expo Go installed on a physical iOS or Android device
 
-**Step 1 — Backend**
+**Terminal 1 — Backend**
+```bash
 cd matchup-backend
 npm install
 npm run dev
+```
+Backend starts on port 3000.
 
-The backend should start on port 3000.
-
-**Step 2 — ngrok tunnel**
+**Terminal 2 — ngrok tunnel**
+```bash
 ngrok http 3000
-Copy the HTTPS URL from the ngrok output and paste it into `src/constants/index.js` as the `API_URL` value.
+```
+Copy the HTTPS URL and paste it into `src/constants/index.js` as the `API_URL` value.
 
-**Step 3 — Expo**
+**Terminal 3 — Expo**
+```bash
 cd ..
 npm install
 npx expo start
+```
+Scan the QR code with Expo Go on your phone.
 
-Scan the QR code in the terminal with Expo Go on your phone.
+---
 
 ## Configuration
 
-The backend requires a `.env` file in the `matchup-backend/` folder containing:
-
+**Backend** — create a `.env` file in `matchup-backend/`:
+```
 PORT=3000
 DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/matchup
 FIREBASE_PROJECT_ID=matchup-app-204ff
+```
 
-The frontend requires the API URL set in `src/constants/index.js` to match your active ngrok tunnel.
+**Frontend** — set `API_URL` in `src/constants/index.js` to match your active ngrok tunnel URL.
 
-## Database setup
+---
+
+## Database Setup
 
 The schema is defined in `matchup-backend/src/db/schema.sql`. To create the database from scratch:
 
+```bash
 createdb matchup
 psql matchup < matchup-backend/src/db/schema.sql
+```
+
+---
+
+## What This Demonstrates
+
+- Full-stack mobile development across React Native, Node.js and PostgreSQL
+- Custom matching algorithm with weighted multi-factor scoring
+- Real-time features using Firebase Auth and Firestore
+- Third-party API integration (Google Places)
+- End-to-end system design, from database schema to mobile UI
+
+---
 
 ## Author
 
-Sumayo Mohamed  
-University of Roehampton, BSc Software Engineering  
-Final Year Project, 2026
+**Sumaya Mohamed** — BEng Software Engineering, University of Roehampton  
+[LinkedIn](https://www.linkedin.com/in/sumaya-m-49557b29b/) · [GitHub](https://github.com/Sumaya1600)
